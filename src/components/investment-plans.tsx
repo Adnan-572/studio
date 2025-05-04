@@ -1,10 +1,11 @@
+
 "use client";
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Zap, Gem, Crown } from "lucide-react"; // Added Crown icon
+import { TrendingUp, Zap, Gem, Crown, Milestone } from "lucide-react"; // Added Milestone icon
 
 interface Plan {
   title: string;
@@ -67,6 +68,17 @@ const plans: Plan[] = [
     exampleDaily: "PKR 2,500 – 3,000", // Calculated: 100k * 2.5% and 100k * 3.0%
     exampleTotal: "PKR 287,500 – 325,000", // Calculated: 100k + (daily * 75)
   },
+  {
+    title: "Master Plan",
+    icon: Milestone, // Added Milestone icon
+    investmentRange: "PKR 1,000 – 100,000", // User provided
+    duration: "90 days", // User provided
+    dailyProfit: "3.0% – 4.5%", // User provided
+    totalReturn: "270% – 405%", // Calculated: 90 * 3.0% and 90 * 4.5%
+    exampleInvestment: "PKR 50,000", // Example within range
+    exampleDaily: "PKR 1,500 – 2,250", // Calculated: 50k * 3.0% and 50k * 4.5%
+    exampleTotal: "PKR 185,000 – 252,500", // Calculated: 50k + (daily * 90)
+  },
 ];
 
 export function InvestmentPlans() {
@@ -78,7 +90,7 @@ export function InvestmentPlans() {
   // };
 
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4"> {/* Changed lg:grid-cols-3 to lg:grid-cols-4 */}
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"> {/* Adjusted lg grid cols to 3 for better layout with 5 plans */}
       {plans.map((plan) => (
         <Card key={plan.title} className={`flex flex-col ${plan.primary ? 'border-primary ring-2 ring-primary shadow-lg' : ''}`}>
           <CardHeader className="items-center pb-4 relative"> {/* Added relative positioning */}
@@ -119,8 +131,8 @@ export function InvestmentPlans() {
           </CardFooter>
         </Card>
       ))}
-       {/* Adjust span to fit 4 columns */}
-       <Card className="col-span-1 md:col-span-2 lg:col-span-4 bg-secondary border-dashed">
+       {/* Adjust span to fit 3 columns */}
+       <Card className="col-span-1 md:col-span-2 lg:col-span-3 bg-secondary border-dashed"> {/* Span 3 to fill the row */}
           <CardHeader>
               <CardTitle className="text-lg">Withdrawal Terms</CardTitle>
           </CardHeader>
