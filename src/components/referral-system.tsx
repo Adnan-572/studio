@@ -5,6 +5,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label'; // Import Label
 import { Copy, Share2, Gift } from 'lucide-react'; // Added Gift icon
 import { useToast } from '@/hooks/use-toast';
 
@@ -104,3 +105,4 @@ export function ReferralSystem({ userId }: ReferralSystemProps) {
         </Card>
     );
 }
+
