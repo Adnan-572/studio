@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from 'lucide-react';
 import { getApprovedInvestmentForUser, getPendingInvestmentForUser, type InvestmentSubmission } from '@/lib/investment-store';
 import { Button } from '@/components/ui/button'; // Keep Button for potential future use
+import { Separator } from '@/components/ui/separator'; // Import Separator
 
 // Simulate a logged-in user ID
 const USER_ID = "user123";
@@ -97,6 +98,7 @@ export default function Home() {
              {/* Pass USER_ID and USER_NAME to InvestmentPlans */}
             <InvestmentPlans userId={USER_ID} userName={USER_NAME} />
           </section>
+           {/* Removed Separator and ReferralSystem section as ReferralSystem component is missing */}
         </>
       )}
     </div>
