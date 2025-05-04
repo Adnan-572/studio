@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { differenceInDays, addDays, format, isPast } from 'date-fns'; // Import isPast
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DollarSign, CalendarDays, TrendingUp, Percent, Hourglass, User, CheckCircle, Banknote, Wallet, Info, Loader2 } from 'lucide-react'; // Added icons
+import { DollarSign, CalendarDays, TrendingUp, Percent, Hourglass, User, CheckCircle, Banknote, Wallet, Info, Loader2, Gift } from 'lucide-react'; // Added Gift icon for bonus
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -52,6 +52,7 @@ interface DailyProfitEntry {
 export function Dashboard({ plan }: DashboardProps) {
   const { toast } = useToast();
   const startDate = React.useMemo(() => new Date(plan.approvalDate!), [plan.approvalDate]);
+  const referralBonus = React.useMemo(() => plan.referralBonusPercent ?? 0, [plan.referralBonusPercent]); // Get referral bonus
   const [currentDate, setCurrentDate] = React.useState<Date>(new Date());
   const [dailyProfits, setDailyProfits] = React.useState<DailyProfitEntry[]>([]);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = React.useState(false);
@@ -69,6 +70,7 @@ export function Dashboard({ plan }: DashboardProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // Recalculate profits when plan or referral bonus changes
   React.useEffect(() => {
     const calculateProfits = () => {
       const profits: DailyProfitEntry[] = [];
@@ -78,10 +80,14 @@ export function Dashboard({ plan }: DashboardProps) {
 
       if (!startDate) return; // Don't calculate if start date isn't set
 
+      // Calculate base daily profit + referral bonus
+      const effectiveDailyProfitMin = plan.dailyProfitMin + referralBonus;
+      const effectiveDailyProfitMax = plan.dailyProfitMax + referralBonus;
+
       for (let i = 1; i <= plan.duration; i++) {
         const profitDate = addDays(startDate, i - 1); // Calculate date for this profit day
-        const dailyMin = (investmentAmount * plan.dailyProfitMin) / 100;
-        const dailyMax = (investmentAmount * plan.dailyProfitMax) / 100;
+        const dailyMin = (investmentAmount * effectiveDailyProfitMin) / 100;
+        const dailyMax = (investmentAmount * effectiveDailyProfitMax) / 100;
 
         cumulativeMin += dailyMin;
         cumulativeMax += dailyMax;
@@ -99,7 +105,7 @@ export function Dashboard({ plan }: DashboardProps) {
     };
 
     calculateProfits();
-  }, [plan, startDate]);
+  }, [plan, startDate, referralBonus]); // Add referralBonus dependency
 
   // Check for existing withdrawal request when component mounts or plan changes
   React.useEffect(() => {
@@ -146,9 +152,13 @@ export function Dashboard({ plan }: DashboardProps) {
     : `${formatCurrency(finalTotalProfitMin)} – ${formatCurrency(finalTotalProfitMax)}`;
 
 
-  const dailyProfitRangeText = plan.dailyProfitMin === plan.dailyProfitMax
-    ? `${plan.dailyProfitMin.toFixed(1)}%`
-    : `${plan.dailyProfitMin.toFixed(1)}% – ${plan.dailyProfitMax.toFixed(1)}%`;
+  // Calculate effective daily profit range text including bonus
+   const effectiveDailyProfitMin = plan.dailyProfitMin + referralBonus;
+   const effectiveDailyProfitMax = plan.dailyProfitMax + referralBonus;
+   const effectiveDailyProfitRangeText = effectiveDailyProfitMin === effectiveDailyProfitMax
+     ? `${effectiveDailyProfitMin.toFixed(1)}%`
+     : `${effectiveDailyProfitMin.toFixed(1)}% – ${effectiveDailyProfitMax.toFixed(1)}%`;
+
 
   const planIcon = plan.icon ? React.createElement(plan.icon, { className: "h-6 w-6" }) : <DollarSign className="h-6 w-6" />;
 
@@ -251,7 +261,12 @@ export function Dashboard({ plan }: DashboardProps) {
              <Percent className="h-6 w-6 text-muted-foreground" />
             <div>
               <p className="text-sm font-medium leading-none">Daily Profit Rate</p>
-              <p className="text-lg font-semibold">{dailyProfitRangeText}</p>
+              <p className="text-lg font-semibold">{effectiveDailyProfitRangeText}</p>
+              {referralBonus > 0 && (
+                   <p className="text-xs text-muted-foreground">
+                       ({plan.dailyProfitMin.toFixed(1)}% Base + {referralBonus.toFixed(1)}% Referral Bonus)
+                   </p>
+               )}
             </div>
           </div>
            <div className="flex items-center space-x-3 rounded-md border p-4 bg-muted/50">
@@ -297,6 +312,18 @@ export function Dashboard({ plan }: DashboardProps) {
             </div>
           </div>
 
+            {/* Add Referral Bonus Card if bonus > 0 */}
+            {referralBonus > 0 && (
+                <div className="flex items-center space-x-3 rounded-md border p-4 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 md:col-span-3">
+                    <Gift className="h-6 w-6" />
+                    <div>
+                        <p className="text-sm font-medium leading-none">Referral Bonus Applied</p>
+                        <p className="text-lg font-semibold">+{referralBonus.toFixed(1)}% Daily Profit</p>
+                         <p className="text-xs text-muted-foreground">Your daily profit includes an extra {referralBonus.toFixed(1)}% thanks to your referrals!</p>
+                    </div>
+                </div>
+            )}
+
         </CardContent>
       </Card>
 
@@ -323,6 +350,7 @@ export function Dashboard({ plan }: DashboardProps) {
                                 Your request for <strong>{formatCurrency(existingWithdrawalRequest.withdrawalAmount)}</strong> via <strong>{existingWithdrawalRequest.paymentMethod}</strong> to account <strong>{existingWithdrawalRequest.accountNumber}</strong> submitted on {format(new Date(existingWithdrawalRequest.requestDate), 'Pp')} is currently {existingWithdrawalRequest.status}.
                                 {existingWithdrawalRequest.status === 'pending' && " Processing usually takes up to 3 business days."}
                                 {existingWithdrawalRequest.status === 'rejected' && ` Reason: ${existingWithdrawalRequest.rejectionReason || 'Not specified.'}`}
+                                {existingWithdrawalRequest.status === 'completed' && ` Transaction ID: ${existingWithdrawalRequest.transactionId || 'N/A'}`}
                             </AlertDescription>
                         </Alert>
                     ) : (
@@ -342,7 +370,7 @@ export function Dashboard({ plan }: DashboardProps) {
       <Card>
         <CardHeader>
           <CardTitle>Daily Profit Log (Estimated)</CardTitle>
-           <CardDescription>Showing potential profit range for each day.</CardDescription>
+           <CardDescription>Showing potential profit range for each day (including referral bonus).</CardDescription>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[300px] w-full"> {/* Adjust height as needed */}

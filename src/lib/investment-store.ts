@@ -17,6 +17,7 @@ export interface InvestmentSubmission extends Omit<Plan, 'icon' | 'badge' | 'pri
     rejectionReason?: string | null; // Reason for rejection
     // Re-include icon name or a way to map it back if needed on dashboard/dev-dashboard
     iconName: string;
+    referralBonusPercent?: number; // Optional: Bonus percentage from referrals at time of approval
 }
 
 // --- Helper Functions ---
@@ -76,6 +77,7 @@ export const addPendingInvestment = async (submission: Omit<InvestmentSubmission
             ...submission,
             id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
             iconName: submission.icon.displayName || submission.icon.name || 'TrendingUp', // Store icon name
+            referralBonusPercent: 0, // Initialize referral bonus
         };
         pending.push(newSubmission);
         setToLocalStorage(PENDING_KEY, pending);
@@ -117,6 +119,7 @@ export const getPendingInvestmentForUser = (userId: string): InvestmentSubmissio
 
 /**
  * Approves a pending investment: moves it from pending to approved and sets approval date.
+ * TODO: Implement logic to calculate actual referral bonus here.
  */
 export const approveInvestment = async (submissionId: string): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -131,8 +134,17 @@ export const approveInvestment = async (submissionId: string): Promise<void> => 
 
         const [submissionToApprove] = pending.splice(index, 1); // Remove from pending
 
+        // --- Referral Bonus Calculation Placeholder ---
+        // Replace this with actual logic to check referred users
+        // and calculate the bonus percentage based on active investments
+        // of those referred users.
+        const calculatedReferralBonus = 0; // Placeholder: Assume 0 for now
+        // --- End Placeholder ---
+
         submissionToApprove.status = 'approved';
         submissionToApprove.approvalDate = new Date().toISOString();
+        submissionToApprove.referralBonusPercent = calculatedReferralBonus; // Assign calculated bonus
+
 
         approved.push(submissionToApprove); // Add to approved
 

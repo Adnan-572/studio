@@ -5,6 +5,7 @@ import * as React from 'react';
 import type { Plan } from '@/components/investment-plans';
 import { InvestmentPlans } from '@/components/investment-plans';
 import { Dashboard } from '@/components/dashboard';
+import { ReferralSystem } from '@/components/referral-system'; // Import ReferralSystem
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, CheckCircle } from 'lucide-react'; // Added CheckCircle
 import { getApprovedInvestmentForUser, getPendingInvestmentForUser, type InvestmentSubmission } from '@/lib/investment-store';
@@ -77,7 +78,7 @@ export default function Home() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 space-y-12"> {/* Added space-y */}
       {activeInvestment ? (
         // User has an active, approved investment -> Show Dashboard
         <section id="dashboard">
@@ -97,7 +98,7 @@ export default function Home() {
         </section>
       ) : pendingInvestment ? (
         // User has submitted proof, waiting for approval
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-300px)]"> {/* Adjusted height */}
           <Alert className="max-w-md text-center">
              <CheckCircle className="h-4 w-4" /> {/* Icon */}
             <AlertTitle className="text-xl font-semibold">Investment Pending Approval</AlertTitle>
@@ -109,17 +110,33 @@ export default function Home() {
       ) : (
         // No active or pending investment, show plans
         <>
-          <h1 className="mb-8 text-3xl font-bold tracking-tight text-center text-primary">
-            Welcome to Rupay Growth
-          </h1>
-          <p className="mb-12 text-center text-muted-foreground">
-            Choose an investment plan below to get started.
-          </p>
+           <section id="welcome" className="text-center">
+                <h1 className="mb-4 text-4xl font-bold tracking-tight text-primary"> {/* Increased size */}
+                  Welcome to Rupay Growth
+                </h1>
+                <p className="mb-8 text-lg text-muted-foreground"> {/* Increased size */}
+                  Choose an investment plan below to get started and grow your capital.
+                </p>
+           </section>
+
+            <Separator />
+
           <section id="investment-plans">
+             <h2 className="text-2xl font-semibold tracking-tight text-center mb-6">Investment Plans</h2>
             <InvestmentPlans userId={USER_ID} userName={USER_NAME} />
           </section>
         </>
       )}
+
+       {/* Always show Referral System if not loading */}
+        {!isLoading && (
+             <>
+                <Separator />
+                <section id="referral-system">
+                    <ReferralSystem userId={USER_ID} />
+                </section>
+             </>
+        )}
     </div>
   );
 }
