@@ -1,7 +1,7 @@
 import { InvestmentPlans } from '@/components/investment-plans';
-import { Dashboard } from '@/components/dashboard';
-import { ReferralSystem } from '@/components/referral-system';
-import { Separator } from '@/components/ui/separator';
+// import { Dashboard } from '@/components/dashboard'; // Commented out for now
+// import { ReferralSystem } from '@/components/referral-system'; // Commented out for now
+// import { Separator } from '@/components/ui/separator'; // Commented out for now
 
 export default function Home() {
   return (
@@ -9,18 +9,23 @@ export default function Home() {
       <h1 className="mb-8 text-3xl font-bold tracking-tight text-center text-primary">
         Welcome to Rupay Growth
       </h1>
+      <p className="mb-12 text-center text-muted-foreground">
+        Choose an investment plan below to get started.
+      </p>
 
       {/* Investment Plans Section */}
-      <section id="investment-plans" className="mb-12">
-        <h2 className="mb-6 text-2xl font-semibold tracking-tight text-center">
-          Investment Plans
-        </h2>
+      <section id="investment-plans">
+         {/* Removed title from here as it's implied by the main heading and description */}
         <InvestmentPlans />
       </section>
 
+      {/*
+      Commented out Dashboard and Referral sections for now.
+      These can be added back later, potentially on a separate dashboard page
+      accessible after login.
+
       <Separator className="my-8" />
 
-      {/* User Dashboard Section */}
       <section id="dashboard" className="mb-12">
         <h2 className="mb-6 text-2xl font-semibold tracking-tight text-center">
           Your Dashboard
@@ -30,13 +35,13 @@ export default function Home() {
 
       <Separator className="my-8" />
 
-      {/* Referral System Section */}
       <section id="referral-system" className="mb-12">
         <h2 className="mb-6 text-2xl font-semibold tracking-tight text-center">
           Referral System
         </h2>
         <ReferralSystem />
       </section>
+      */}
     </div>
   );
 }
