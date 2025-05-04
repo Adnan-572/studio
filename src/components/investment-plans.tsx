@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Zap, Gem } from "lucide-react"; // Icons for plans
+import { TrendingUp, Zap, Gem, Crown } from "lucide-react"; // Added Crown icon
 
 interface Plan {
   title: string;
@@ -56,6 +56,17 @@ const plans: Plan[] = [
     exampleDaily: "PKR 400 – 500",
     exampleTotal: "PKR 40,000 – 50,000",
   },
+  {
+    title: "Expert Plan",
+    icon: Crown, // Added Crown icon
+    investmentRange: "PKR 50,000 – 500,000",
+    duration: "75 days", // Assuming duration
+    dailyProfit: "2.5% – 3.0%",
+    totalReturn: "187.5% – 225%", // Calculated: 75 * 2.5% and 75 * 3.0%
+    exampleInvestment: "PKR 100,000", // Example within range
+    exampleDaily: "PKR 2,500 – 3,000", // Calculated: 100k * 2.5% and 100k * 3.0%
+    exampleTotal: "PKR 287,500 – 325,000", // Calculated: 100k + (daily * 75)
+  },
 ];
 
 export function InvestmentPlans() {
@@ -67,10 +78,10 @@ export function InvestmentPlans() {
   // };
 
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4"> {/* Changed lg:grid-cols-3 to lg:grid-cols-4 */}
       {plans.map((plan) => (
         <Card key={plan.title} className={`flex flex-col ${plan.primary ? 'border-primary ring-2 ring-primary shadow-lg' : ''}`}>
-          <CardHeader className="items-center pb-4">
+          <CardHeader className="items-center pb-4 relative"> {/* Added relative positioning */}
             {plan.badge && (
               <Badge variant={plan.primary ? "default" : "secondary"} className="absolute -top-3 right-3">{plan.badge}</Badge>
             )}
@@ -108,7 +119,8 @@ export function InvestmentPlans() {
           </CardFooter>
         </Card>
       ))}
-       <Card className="col-span-1 md:col-span-2 lg:col-span-3 bg-secondary border-dashed">
+       {/* Adjust span to fit 4 columns */}
+       <Card className="col-span-1 md:col-span-2 lg:col-span-4 bg-secondary border-dashed">
           <CardHeader>
               <CardTitle className="text-lg">Withdrawal Terms</CardTitle>
           </CardHeader>
