@@ -2,16 +2,16 @@
 "use client";
 
 import * as React from 'react';
-import type { Plan } from './investment-plans'; // Assuming Plan type is exported
+import type { InvestmentSubmission } from '@/lib/investment-store'; // Use InvestmentSubmission type
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { differenceInDays, addDays, format } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DollarSign, CalendarDays, TrendingUp, Percent, Hourglass } from 'lucide-react';
+import { DollarSign, CalendarDays, TrendingUp, Percent, Hourglass, User, CheckCircle } from 'lucide-react';
 
 interface DashboardProps {
-  plan: Plan;
+  plan: InvestmentSubmission; // Use InvestmentSubmission which includes startDate and approvalDate
 }
 
 // Helper function to format currency (ensure it's consistent)
@@ -32,7 +32,8 @@ interface DailyProfitEntry {
 }
 
 export function Dashboard({ plan }: DashboardProps) {
-  const [startDate] = React.useState<Date>(new Date()); // Set investment start date to now
+  // Use the actual approvalDate from the plan as the investment start date
+  const startDate = React.useMemo(() => new Date(plan.approvalDate!), [plan.approvalDate]);
   const [currentDate, setCurrentDate] = React.useState<Date>(new Date());
   const [dailyProfits, setDailyProfits] = React.useState<DailyProfitEntry[]>([]);
 
@@ -51,8 +52,10 @@ export function Dashboard({ plan }: DashboardProps) {
       let cumulativeMax = 0;
       const investmentAmount = plan.investmentAmount;
 
+      if (!startDate) return; // Don't calculate if start date isn't set
+
       for (let i = 1; i <= plan.duration; i++) {
-        const profitDate = addDays(startDate, i -1 ); // Calculate date for this profit day
+        const profitDate = addDays(startDate, i - 1); // Calculate date for this profit day
         const dailyMin = (investmentAmount * plan.dailyProfitMin) / 100;
         const dailyMax = (investmentAmount * plan.dailyProfitMax) / 100;
 
@@ -74,6 +77,10 @@ export function Dashboard({ plan }: DashboardProps) {
     calculateProfits();
   }, [plan, startDate]); // Recalculate if plan or start date changes
 
+  if (!startDate) {
+    return <p>Loading investment data...</p>; // Or some loading indicator
+  }
+
   const daysElapsed = Math.max(0, differenceInDays(currentDate, startDate));
   const daysRemaining = Math.max(0, plan.duration - daysElapsed);
   const progress = Math.min(100, Math.max(0,(daysElapsed / plan.duration) * 100));
@@ -81,11 +88,13 @@ export function Dashboard({ plan }: DashboardProps) {
   const endDate = addDays(startDate, plan.duration);
 
   // Determine current cumulative profit based on days elapsed
-  const currentCumulativeMin = daysElapsed >= 1 ? dailyProfits[daysElapsed - 1]?.cumulativeMin ?? 0 : 0;
-  const currentCumulativeMax = daysElapsed >= 1 ? dailyProfits[daysElapsed - 1]?.cumulativeMax ?? 0 : 0;
-  const currentCumulativeProfitText = currentCumulativeMin === currentCumulativeMax
-    ? formatCurrency(currentCumulativeMin)
-    : `${formatCurrency(currentCumulativeMin)} – ${formatCurrency(currentCumulativeMax)}`;
+   const currentProfitIndex = Math.min(daysElapsed, plan.duration) - 1;
+   const currentCumulativeMin = currentProfitIndex >= 0 ? dailyProfits[currentProfitIndex]?.cumulativeMin ?? 0 : 0;
+   const currentCumulativeMax = currentProfitIndex >= 0 ? dailyProfits[currentProfitIndex]?.cumulativeMax ?? 0 : 0;
+   const currentCumulativeProfitText = currentCumulativeMin === currentCumulativeMax
+     ? formatCurrency(currentCumulativeMin)
+     : `${formatCurrency(currentCumulativeMin)} – ${formatCurrency(currentCumulativeMax)}`;
+
 
   // Final total return calculation
   const finalTotalReturnMin = plan.investmentAmount + (dailyProfits[plan.duration - 1]?.cumulativeMin ?? 0);
@@ -99,16 +108,28 @@ export function Dashboard({ plan }: DashboardProps) {
     ? `${plan.dailyProfitMin.toFixed(1)}%`
     : `${plan.dailyProfitMin.toFixed(1)}% – ${plan.dailyProfitMax.toFixed(1)}%`;
 
+  const planIcon = plan.icon ? React.createElement(plan.icon, { className: "h-6 w-6" }) : <DollarSign className="h-6 w-6" />;
+
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl text-primary">
-            <plan.icon className="h-6 w-6" /> {plan.title} Overview
+            {planIcon} {plan.title} Overview
           </CardTitle>
-          <CardDescription>Your investment started on {format(startDate, 'PPP')}.</CardDescription>
+          <CardDescription>
+              Investment started on {format(startDate, 'PPP')} by {plan.userName}. Approved on {format(new Date(plan.approvalDate!), 'Pp')}.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="flex items-center space-x-3 rounded-md border p-4 bg-muted/50">
+              <User className="h-6 w-6 text-muted-foreground" />
+              <div>
+                  <p className="text-sm font-medium leading-none">Investor</p>
+                  <p className="text-lg font-semibold">{plan.userName} ({plan.userId})</p>
+              </div>
+          </div>
           <div className="flex items-center space-x-3 rounded-md border p-4 bg-muted/50">
             <DollarSign className="h-6 w-6 text-muted-foreground" />
             <div>
@@ -145,7 +166,7 @@ export function Dashboard({ plan }: DashboardProps) {
             </div>
           </div>
            <div className="flex items-center space-x-3 rounded-md border p-4 bg-green-600/10 text-green-700 dark:text-green-400">
-             <DollarSign className="h-6 w-6" />
+             <CheckCircle className="h-6 w-6" /> {/* Changed icon */}
             <div>
               <p className="text-sm font-medium leading-none">Total Return (Est.)</p>
               <p className="text-lg font-semibold">{finalTotalReturnText}</p>
@@ -186,7 +207,11 @@ export function Dashboard({ plan }: DashboardProps) {
               </TableHeader>
               <TableBody>
                 {dailyProfits.map((entry) => {
-                   const isPast = differenceInDays(currentDate, new Date(entry.date)) >= 0;
+                   // Check if the profit entry's date is on or before the current date
+                   const entryDate = new Date(entry.date);
+                   entryDate.setHours(23, 59, 59, 999); // Consider the whole day
+                   const isPastOrToday = currentDate >= entryDate;
+
                    const dailyProfitText = entry.profitMin === entry.profitMax
                         ? formatCurrency(entry.profitMin)
                         : `${formatCurrency(entry.profitMin)} – ${formatCurrency(entry.profitMax)}`;
@@ -195,13 +220,13 @@ export function Dashboard({ plan }: DashboardProps) {
                         : `${formatCurrency(entry.cumulativeMin)} – ${formatCurrency(entry.cumulativeMax)}`;
 
                   return (
-                    <TableRow key={entry.day} className={isPast ? 'bg-muted/30' : ''}>
+                    <TableRow key={entry.day} className={isPastOrToday ? 'bg-muted/30' : ''}>
                       <TableCell className="font-medium">{entry.day}</TableCell>
                       <TableCell>{entry.date}</TableCell>
-                      <TableCell className={`text-right ${isPast ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                      <TableCell className={`text-right ${isPastOrToday ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                         {dailyProfitText}
                       </TableCell>
-                      <TableCell className={`text-right ${isPast ? 'font-semibold' : 'text-muted-foreground'}`}>
+                      <TableCell className={`text-right ${isPastOrToday ? 'font-semibold' : 'text-muted-foreground'}`}>
                         {cumulativeProfitText}
                       </TableCell>
                     </TableRow>

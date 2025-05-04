@@ -9,30 +9,31 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator } from "lucide-react";
+import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2 } from "lucide-react";
 import { Separator } from '@/components/ui/separator';
+import { addPendingInvestment } from '@/lib/investment-store'; // Import store function
 
 // Export Plan interface if not already done elsewhere
 export interface Plan {
   title: string;
   icon: React.ElementType;
-  investmentRange: string;
+  investmentRange: string; // Display range
   duration: number;
   dailyProfitMin: number;
   dailyProfitMax: number;
   badge?: string;
   primary?: boolean;
-  investmentAmount: number;
+  // Investment amount is now potentially variable, use min/max for validation
   minInvestment: number;
   maxInvestment: number;
+  // Removed fixed investmentAmount, calculated dynamically or set specifically for basic plan
 }
 
-const plans: Plan[] = [
-  {
+const plansData: Omit<Plan, 'investmentAmount'>[] = [
+   {
     title: "Basic Plan",
     icon: TrendingUp,
-    investmentRange: "PKR 500",
-    investmentAmount: 500,
+    investmentRange: "PKR 500", // Specific amount shown
     duration: 15,
     dailyProfitMin: 1.0,
     dailyProfitMax: 1.5,
@@ -43,7 +44,6 @@ const plans: Plan[] = [
     title: "Advance Plan",
     icon: Zap,
     investmentRange: "PKR 500 – 50,000",
-    investmentAmount: 10000,
     duration: 25,
     dailyProfitMin: 1.5,
     dailyProfitMax: 2.0,
@@ -56,7 +56,6 @@ const plans: Plan[] = [
     title: "Premium Plan",
     icon: Gem,
     investmentRange: "PKR 1,000 – 100,000",
-    investmentAmount: 20000,
     duration: 50,
     dailyProfitMin: 2.0,
     dailyProfitMax: 2.5,
@@ -67,7 +66,6 @@ const plans: Plan[] = [
     title: "Expert Plan",
     icon: Crown,
     investmentRange: "PKR 50,000 – 500,000",
-    investmentAmount: 100000,
     duration: 75,
     dailyProfitMin: 2.5,
     dailyProfitMax: 3.0,
@@ -78,7 +76,6 @@ const plans: Plan[] = [
     title: "Master Plan",
     icon: Milestone,
     investmentRange: "PKR 1,000 – 100,000",
-    investmentAmount: 50000,
     duration: 90,
     dailyProfitMin: 3.0,
     dailyProfitMax: 4.5,
@@ -86,6 +83,13 @@ const plans: Plan[] = [
     maxInvestment: 100000,
   },
 ];
+
+// Enrich plans with default investment amount for calculator (e.g., min or a typical value)
+const plans: Plan[] = plansData.map(p => ({
+  ...p,
+  // Default calculator amount to minInvestment, except for Basic Plan
+  investmentAmount: p.title === "Basic Plan" ? p.minInvestment : p.minInvestment,
+}));
 
 const paymentDetails = {
   easypaisa: {
@@ -102,12 +106,13 @@ const formatCurrency = (amount: number) => {
   if (!Number.isFinite(amount)) {
     return 'PKR 0.00';
   }
-  return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; // No decimal places for display
 };
 
 // Profit Calculator Component
 const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
-    const [amount, setAmount] = React.useState<string>(plan.investmentAmount.toString());
+    // Initialize amount with the plan's *minimum* investment for flexibility
+    const [amount, setAmount] = React.useState<string>(plan.minInvestment.toString());
     const [dailyProfitMin, setDailyProfitMin] = React.useState<number>(0);
     const [dailyProfitMax, setDailyProfitMax] = React.useState<number>(0);
     const [totalReturnMin, setTotalReturnMin] = React.useState<number>(0);
@@ -115,7 +120,7 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
     const [isValidAmount, setIsValidAmount] = React.useState<boolean>(true);
 
     React.useEffect(() => {
-        const investmentAmount = parseFloat(amount);
+        const investmentAmount = parseInt(amount, 10); // Use parseInt for whole numbers
         if (isNaN(investmentAmount) || investmentAmount < plan.minInvestment || investmentAmount > plan.maxInvestment) {
             setIsValidAmount(false);
             setDailyProfitMin(0);
@@ -140,8 +145,14 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
+        // Allow only digits, handle empty string for clearing
         if (value === '' || /^[0-9]*$/.test(value)) {
-           setAmount(value);
+           // Prevent leading zeros unless it's just '0'
+           if (value.length > 1 && value.startsWith('0')) {
+             setAmount(value.substring(1));
+           } else {
+             setAmount(value);
+           }
         }
     };
 
@@ -160,78 +171,149 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
             </Label>
             <Input
                 id={`calc-amount-${plan.title}`}
-                type="number"
+                type="text" // Use text to better handle input filtering
+                inputMode="numeric" // Hint for numeric keyboard on mobile
                 value={amount}
                 onChange={handleAmountChange}
-                placeholder={`Enter amount (${formatCurrency(plan.minInvestment)} - ${formatCurrency(plan.maxInvestment)})`}
+                placeholder={`Amount (${formatCurrency(plan.minInvestment)} - ${formatCurrency(plan.maxInvestment)})`}
                 className={`h-8 text-sm mb-2 ${!isValidAmount && amount !== '' ? 'border-destructive ring-destructive focus-visible:ring-destructive' : ''}`}
-                min={plan.minInvestment}
-                max={plan.maxInvestment}
-                step="1"
+                // min={plan.minInvestment} // Min/max not strictly enforced on text input
+                // max={plan.maxInvestment}
+                // step="1"
             />
             {!isValidAmount && amount !== '' && (
                  <p className="text-xs text-destructive mb-2">
-                     Please enter amount between {formatCurrency(plan.minInvestment)} and {formatCurrency(plan.maxInvestment)}.
+                     Enter amount between {formatCurrency(plan.minInvestment)} and {formatCurrency(plan.maxInvestment)}.
                 </p>
             )}
             {isValidAmount && amount !== '' && (
                 <div className="text-xs space-y-1">
                      <div className="flex justify-between">
-                         <span className="text-muted-foreground">Daily Profit:</span>
+                         <span className="text-muted-foreground">Daily Profit (Est.):</span>
                          <span className="font-medium text-primary">{dailyProfitText}</span>
                      </div>
                      <div className="flex justify-between">
-                         <span className="text-muted-foreground">Total Return (after {plan.duration} days):</span>
+                         <span className="text-muted-foreground">Total Return (Est. after {plan.duration} days):</span>
                          <span className="font-semibold">{totalReturnText}</span>
                      </div>
                  </div>
+            )}
+             {amount === '' && (
+                 <p className="text-xs text-muted-foreground mb-2">
+                     Enter an amount to calculate potential profit.
+                 </p>
             )}
         </div>
     );
 };
 
 interface InvestmentPlansProps {
-  onInvestSuccess: (plan: Plan) => void; // Callback function for successful investment
+  userId: string; // Required user ID
+  userName: string; // Required user name
+ // onInvestSuccess: (plan: Plan) => void; // Callback function REMOVED - Handled internally now
 }
 
-export function InvestmentPlans({ onInvestSuccess }: InvestmentPlansProps) {
+export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
   const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [investmentAmount, setInvestmentAmount] = React.useState<string>(''); // Amount user wants to invest
   const [transactionProof, setTransactionProof] = React.useState<File | null>(null);
+   const [transactionProofDataUrl, setTransactionProofDataUrl] = React.useState<string | null>(null); // For storing the proof as Data URL
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [amountError, setAmountError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleInvestClick = (plan: Plan) => {
     setSelectedPlan(plan);
-    setIsModalOpen(true);
+    // Reset amount for each modal opening, prefill basic plan amount
+    setInvestmentAmount(plan.title === "Basic Plan" ? plan.minInvestment.toString() : '');
+    setAmountError(null);
     setTransactionProof(null);
+    setTransactionProofDataUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    setIsModalOpen(true);
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-       if (file.size > 5 * 1024 * 1024) {
-          toast({
-            variant: "destructive",
-            title: "File Too Large",
-            description: "Please upload an image smaller than 5MB.",
-          });
-          setTransactionProof(null);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          return;
+   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+     const value = e.target.value;
+     if (value === '' || /^[0-9]*$/.test(value)) {
+        let finalValue = value;
+         // Prevent leading zeros unless it's just '0'
+        if (value.length > 1 && value.startsWith('0')) {
+          finalValue = value.substring(1);
         }
-      setTransactionProof(file);
-    } else {
-        setTransactionProof(null);
-    }
-  };
+
+        setInvestmentAmount(finalValue);
+
+        // Validation
+        if (selectedPlan && finalValue !== '') {
+             const numAmount = parseInt(finalValue, 10);
+             if (isNaN(numAmount) || numAmount < selectedPlan.minInvestment || numAmount > selectedPlan.maxInvestment) {
+                 setAmountError(`Amount must be between ${formatCurrency(selectedPlan.minInvestment)} and ${formatCurrency(selectedPlan.maxInvestment)}.`);
+             } else {
+                 setAmountError(null);
+             }
+        } else {
+            setAmountError(null); // Clear error if empty
+        }
+     }
+   };
+
+   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+     if (event.target.files && event.target.files[0]) {
+       const file = event.target.files[0];
+       if (file.size > 5 * 1024 * 1024) { // 5MB limit
+         toast({
+           variant: "destructive",
+           title: "File Too Large",
+           description: "Please upload an image smaller than 5MB.",
+         });
+         setTransactionProof(null);
+         setTransactionProofDataUrl(null);
+         if (fileInputRef.current) fileInputRef.current.value = "";
+         return;
+       }
+
+       // Read file as Data URL
+       const reader = new FileReader();
+       reader.onloadend = () => {
+          setTransactionProof(file);
+          setTransactionProofDataUrl(reader.result as string);
+       }
+       reader.onerror = (error) => {
+           console.error("Error reading file:", error);
+           toast({ variant: "destructive", title: "Error Reading File", description: "Could not process the selected file." });
+           setTransactionProof(null);
+           setTransactionProofDataUrl(null);
+           if (fileInputRef.current) fileInputRef.current.value = "";
+       }
+       reader.readAsDataURL(file);
+
+     } else {
+       setTransactionProof(null);
+       setTransactionProofDataUrl(null);
+     }
+   };
+
 
   const handleSubmitProof = async () => {
-    if (!transactionProof || !selectedPlan) {
+     // --- Validation ---
+    if (!selectedPlan) return; // Should not happen, but good practice
+
+     const finalAmount = parseInt(investmentAmount, 10);
+      if (isNaN(finalAmount) || finalAmount < selectedPlan.minInvestment || finalAmount > selectedPlan.maxInvestment) {
+         setAmountError(`Amount must be between ${formatCurrency(selectedPlan.minInvestment)} and ${formatCurrency(selectedPlan.maxInvestment)}.`);
+         toast({ variant: "destructive", title: "Invalid Amount", description: amountError });
+         return;
+     } else {
+         setAmountError(null); // Clear error if validation passes now
+     }
+
+
+    if (!transactionProofDataUrl) { // Check for Data URL
       toast({
         variant: "destructive",
         title: "Upload Required",
@@ -239,24 +321,57 @@ export function InvestmentPlans({ onInvestSuccess }: InvestmentPlansProps) {
       });
       return;
     }
+     if (amountError) {
+       toast({ variant: "destructive", title: "Invalid Amount", description: amountError });
+       return;
+     }
+    // --- End Validation ---
+
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+        // Prepare submission data
+        const submissionData = {
+            ...selectedPlan, // Spread the selected plan details
+            investmentAmount: finalAmount, // Use the validated, final amount
+            userId: userId,
+            userName: userName,
+            transactionProofDataUrl: transactionProofDataUrl, // Use the data URL
+            submissionDate: new Date().toISOString(),
+            status: 'pending' as const, // Initial status
+            // approvalDate: null, // No approval date yet
+        };
 
-    // On Success:
-    toast({
-      title: "Proof Submitted Successfully",
-      description: `Your investment proof for the ${selectedPlan.title} (${formatCurrency(selectedPlan.investmentAmount)}) has been submitted. Please review the agreement.`,
-      variant: 'default', // Use success variant
-    });
-    setIsModalOpen(false); // Close modal on success
+         console.log("Submitting investment proof:", submissionData);
 
-    // Call the success callback passed from the parent (Home page)
-    onInvestSuccess(selectedPlan);
 
-    setIsSubmitting(false);
+        // Simulate API call to store pending investment
+        await addPendingInvestment(submissionData);
+
+
+        toast({
+            title: "Proof Submitted Successfully",
+            description: `Your investment proof for the ${selectedPlan.title} (${formatCurrency(finalAmount)}) is pending approval.`,
+            variant: 'default',
+        });
+
+        setIsModalOpen(false); // Close modal on success
+
+        // NO LONGER NEEDED: Parent page (Home) will detect the pending state from the store
+        // onInvestSuccess(selectedPlan);
+
+
+    } catch (error) {
+         console.error("Submission error:", error);
+        toast({
+            variant: "destructive",
+            title: "Submission Failed",
+            description: "There was an error submitting your proof. Please try again.",
+        });
+    } finally {
+       setIsSubmitting(false);
+    }
   };
 
    const copyToClipboard = (text: string, fieldName: string) => {
@@ -292,6 +407,12 @@ export function InvestmentPlans({ onInvestSuccess }: InvestmentPlansProps) {
             ? `${totalReturnMinPercent.toFixed(1)}%`
             : `${totalReturnMinPercent.toFixed(1)}% – ${totalReturnMaxPercent.toFixed(1)}%`;
 
+          // Determine the display investment amount (fixed for basic, range otherwise)
+           const displayInvestment = plan.title === "Basic Plan"
+                ? formatCurrency(plan.minInvestment)
+                : plan.investmentRange; // Use the range string for others
+
+
           return (
             <Card key={plan.title} className={`flex flex-col ${plan.primary ? 'border-primary ring-2 ring-primary shadow-lg' : ''}`}>
               <CardHeader className="items-center pb-4 relative">
@@ -300,7 +421,7 @@ export function InvestmentPlans({ onInvestSuccess }: InvestmentPlansProps) {
                 )}
                 <plan.icon className={`h-10 w-10 mb-2 ${plan.primary ? 'text-primary' : 'text-accent'}`} />
                 <CardTitle className="text-xl">{plan.title}</CardTitle>
-                <CardDescription className="text-center">Invest {plan.investmentRange}</CardDescription>
+                 <CardDescription className="text-center">Invest {displayInvestment}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-3 text-sm">
                 <div className="flex justify-between">
@@ -312,7 +433,7 @@ export function InvestmentPlans({ onInvestSuccess }: InvestmentPlansProps) {
                   <span className="font-medium text-primary">{dailyProfitText}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Return %:</span>
+                  <span className="text-muted-foreground">Total Return % (Est.):</span>
                   <span className="font-medium">{totalReturnText}</span>
                 </div>
                  {/* Profit Calculator */}
@@ -324,10 +445,8 @@ export function InvestmentPlans({ onInvestSuccess }: InvestmentPlansProps) {
                   variant={plan.primary ? "default" : "outline"}
                   onClick={() => handleInvestClick(plan)}
                 >
-                   {/* Show only the specific amount for the basic plan in the button */}
-                   {plan.title === "Basic Plan"
-                     ? `Invest Now (${formatCurrency(plan.investmentAmount)})`
-                     : `Invest Now`}
+                   {/* Button text consistent */}
+                   Invest Now
                 </Button>
               </CardFooter>
             </Card>
@@ -352,17 +471,32 @@ export function InvestmentPlans({ onInvestSuccess }: InvestmentPlansProps) {
             <>
               <DialogHeader>
                 <DialogTitle className="text-2xl text-primary">Invest in {selectedPlan.title}</DialogTitle>
-                <DialogDescription>
-                   To activate the {selectedPlan.title} ({formatCurrency(selectedPlan.investmentAmount)} for {selectedPlan.duration} days), please send the exact amount of <strong className="text-foreground">{formatCurrency(selectedPlan.investmentAmount)}</strong> to one of the accounts below and upload the transaction proof.
-                    {/* Add warning for non-basic plans */}
-                    {selectedPlan.title !== "Basic Plan" && (
-                      <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
-                        Note: For this plan, you define the investment amount within the allowed range ({formatCurrency(selectedPlan.minInvestment)} - {formatCurrency(selectedPlan.maxInvestment)}). The amount shown ({formatCurrency(selectedPlan.investmentAmount)}) is an example. Ensure you send the correct amount you wish to invest.
-                      </p>
-                    )}
+                 <DialogDescription>
+                    Enter the amount you wish to invest (within the plan's range), send the payment to one of the accounts below, and upload the transaction proof.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-6 py-4">
+
+                {/* Investment Amount Input */}
+                <div className="space-y-2">
+                   <Label htmlFor="investment-amount" className="text-base font-semibold">Investment Amount (PKR)</Label>
+                   <Input
+                       id="investment-amount"
+                       type="text" // Use text for custom handling
+                       inputMode="numeric"
+                       value={investmentAmount}
+                       onChange={handleAmountChange}
+                       placeholder={`e.g., ${selectedPlan.minInvestment}`}
+                       className={amountError ? 'border-destructive' : ''}
+                       disabled={selectedPlan.title === "Basic Plan"} // Disable for basic plan
+                       required
+                   />
+                   <p className="text-xs text-muted-foreground">
+                      Range: {formatCurrency(selectedPlan.minInvestment)} – {formatCurrency(selectedPlan.maxInvestment)}
+                   </p>
+                   {amountError && <p className="text-xs text-destructive">{amountError}</p>}
+                </div>
+
                 {/* Payment Details */}
                 <div className="space-y-4">
                    <h3 className="font-semibold text-lg mb-2">Payment Accounts:</h3>
@@ -432,10 +566,14 @@ export function InvestmentPlans({ onInvestSuccess }: InvestmentPlansProps) {
                 <Button
                   type="button"
                   onClick={handleSubmitProof}
-                  disabled={isSubmitting || !transactionProof}
+                  disabled={isSubmitting || !transactionProofDataUrl || !!amountError || investmentAmount === ''} // Also disable if amount empty or error
                   aria-live="polite"
                 >
-                  {isSubmitting ? "Submitting..." : "Submit Proof"}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
+                    </>
+                   ) : "Submit Proof"}
                 </Button>
               </DialogFooter>
             </>
