@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -6,6 +7,7 @@ import {
   getAllPendingInvestments,
   approveInvestment,
   rejectInvestment,
+  getAllApprovedInvestments, // Import function to get all approved investments
   type InvestmentSubmission,
 } from '@/lib/investment-store';
 import {
@@ -18,9 +20,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, addDays, differenceInDays, isPast } from 'date-fns'; // Added date functions
 import Image from 'next/image'; // Use next/image for optimization
-import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Clock, Ban, Wallet } from 'lucide-react'; // Added icons
+import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Clock, Ban, Wallet, ListChecks, UserCheck } from 'lucide-react'; // Added icons
 import {
   Dialog,
   DialogContent,
@@ -34,7 +36,7 @@ import {
 import { Input } from '@/components/ui/input'; // For transaction ID/reason
 import { Label } from '@/components/ui/label'; // For transaction ID/reason
 import { Textarea } from '@/components/ui/textarea';
-
+import { Badge } from '@/components/ui/badge'; // Import Badge
 
 // Helper to format currency
 const formatCurrency = (amount: number): string => {
@@ -48,8 +50,10 @@ const formatCurrency = (amount: number): string => {
 
 export default function DeveloperDashboardPage() {
   const [pendingInvestments, setPendingInvestments] = React.useState<InvestmentSubmission[]>([]);
+  const [activeInvestments, setActiveInvestments] = React.useState<InvestmentSubmission[]>([]); // State for active investments
   const [pendingWithdrawals, setPendingWithdrawals] = React.useState<WithdrawalRequest[]>([]);
   const [isLoadingInvestments, setIsLoadingInvestments] = React.useState(true);
+  const [isLoadingActive, setIsLoadingActive] = React.useState(true); // Loading state for active investments
   const [isLoadingWithdrawals, setIsLoadingWithdrawals] = React.useState(true);
   const [isProcessingInvestment, setIsProcessingInvestment] = React.useState<Record<string, boolean>>({});
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = React.useState<Record<string, boolean>>({}); // Track withdrawal processing
@@ -69,6 +73,15 @@ export default function DeveloperDashboardPage() {
     setIsLoadingInvestments(false);
   }, []);
 
+  // Fetch Active Investments
+  const fetchActiveInvestments = React.useCallback(() => {
+    setIsLoadingActive(true);
+    const active = getAllApprovedInvestments(); // Fetch all approved
+    console.log("Fetched active investments:", active);
+    setActiveInvestments(active);
+    setIsLoadingActive(false);
+  }, []);
+
   // Fetch Pending Withdrawals
   const fetchPendingWithdrawals = React.useCallback(() => {
     setIsLoadingWithdrawals(true);
@@ -80,15 +93,17 @@ export default function DeveloperDashboardPage() {
 
   React.useEffect(() => {
     fetchPendingInvestments();
+    fetchActiveInvestments(); // Fetch active investments on mount
     fetchPendingWithdrawals();
 
     // Refresh every 15 seconds
     const interval = setInterval(() => {
         fetchPendingInvestments();
+        fetchActiveInvestments();
         fetchPendingWithdrawals();
     }, 15000);
     return () => clearInterval(interval);
-  }, [fetchPendingInvestments, fetchPendingWithdrawals]);
+  }, [fetchPendingInvestments, fetchActiveInvestments, fetchPendingWithdrawals]);
 
 
   // --- Investment Handlers ---
@@ -101,6 +116,7 @@ export default function DeveloperDashboardPage() {
         description: `Investment ID ${submissionId} has been approved.`,
       });
       fetchPendingInvestments(); // Refresh the list
+      fetchActiveInvestments(); // Refresh active list as well
     } catch (error) {
       console.error('Approval error:', error);
       toast({
@@ -197,14 +213,15 @@ export default function DeveloperDashboardPage() {
         Developer Dashboard
       </h1>
 
-      <Tabs defaultValue="investments" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="investments">Pending Investments ({pendingInvestments.length})</TabsTrigger>
-              <TabsTrigger value="withdrawals">Pending Withdrawals ({pendingWithdrawals.length})</TabsTrigger>
+      <Tabs defaultValue="pending-investments" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6"> {/* Adjusted grid cols */}
+              <TabsTrigger value="pending-investments">Pending Investments ({pendingInvestments.length})</TabsTrigger>
+              <TabsTrigger value="active-investments">Active Investments ({activeInvestments.length})</TabsTrigger> {/* New Tab */}
+              <TabsTrigger value="pending-withdrawals">Pending Withdrawals ({pendingWithdrawals.length})</TabsTrigger>
           </TabsList>
 
-          {/* Investments Tab */}
-          <TabsContent value="investments">
+          {/* Pending Investments Tab */}
+          <TabsContent value="pending-investments">
               <Card>
                   <CardHeader>
                       <CardTitle>Review Investment Submissions</CardTitle>
@@ -238,7 +255,7 @@ export default function DeveloperDashboardPage() {
                                           </TableCell>
                                           <TableCell>{submission.title}</TableCell>
                                           <TableCell className="text-right font-medium">{formatCurrency(submission.investmentAmount)}</TableCell>
-                                          <TableCell>{format(new Date(submission.submissionDate), 'PPp')}</TableCell>
+                                          <TableCell>{format(new Date(submission.submissionDate), 'Pp')}</TableCell>
                                           <TableCell className="text-center">
                                               {submission.transactionProofDataUrl ? (
                                                   <Button
@@ -289,8 +306,65 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
-          {/* Withdrawals Tab */}
-          <TabsContent value="withdrawals">
+          {/* Active Investments Tab */}
+          <TabsContent value="active-investments">
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Active Investments</CardTitle>
+                      <CardDescription>Overview of all currently active investments.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      {isLoadingActive ? (
+                          <div className="flex justify-center items-center min-h-[200px]">
+                              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                          </div>
+                      ) : activeInvestments.length === 0 ? (
+                          <p className="text-center text-muted-foreground mt-6">No active investments found.</p>
+                      ) : (
+                          <Table>
+                              <TableHeader>
+                                  <TableRow>
+                                      <TableHead>User</TableHead>
+                                      <TableHead>Plan</TableHead>
+                                      <TableHead className="text-right">Amount</TableHead>
+                                      <TableHead>Approved On</TableHead>
+                                      <TableHead>Ends On</TableHead>
+                                      <TableHead>Status</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {activeInvestments.map((investment) => {
+                                      const startDate = new Date(investment.approvalDate!);
+                                      const endDate = addDays(startDate, investment.duration);
+                                      const isComplete = isPast(endDate);
+
+                                      return (
+                                          <TableRow key={investment.id}>
+                                              <TableCell>
+                                                  <div>{investment.userName}</div>
+                                                  <div className="text-xs text-muted-foreground">{investment.userId}</div>
+                                              </TableCell>
+                                              <TableCell>{investment.title}</TableCell>
+                                              <TableCell className="text-right font-medium">{formatCurrency(investment.investmentAmount)}</TableCell>
+                                              <TableCell>{format(startDate, 'Pp')}</TableCell>
+                                              <TableCell>{format(endDate, 'Pp')}</TableCell>
+                                              <TableCell>
+                                                  <Badge variant={isComplete ? "secondary" : "default"}>
+                                                      {isComplete ? "Completed" : "Active"}
+                                                  </Badge>
+                                              </TableCell>
+                                          </TableRow>
+                                      );
+                                  })}
+                              </TableBody>
+                          </Table>
+                      )}
+                  </CardContent>
+              </Card>
+          </TabsContent>
+
+          {/* Pending Withdrawals Tab */}
+          <TabsContent value="pending-withdrawals">
                <Card>
                   <CardHeader>
                       <CardTitle>Review Withdrawal Requests</CardTitle>
@@ -330,7 +404,7 @@ export default function DeveloperDashboardPage() {
                                           <TableCell className="text-right font-medium">{formatCurrency(request.withdrawalAmount)}</TableCell>
                                           <TableCell className="capitalize">{request.paymentMethod}</TableCell>
                                           <TableCell>{request.accountNumber}</TableCell>
-                                          <TableCell>{format(new Date(request.requestDate), 'PPp')}</TableCell>
+                                          <TableCell>{format(new Date(request.requestDate), 'Pp')}</TableCell>
                                           <TableCell className="text-center space-x-2">
                                               <Button
                                                   variant="default"
