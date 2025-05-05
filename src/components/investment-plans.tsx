@@ -93,8 +93,8 @@ const plans: Plan[] = plansData.map(p => ({
 
 const paymentDetails = {
   easypaisa: {
-    accountName: "Rupay Growth Finance",
-    accountNumber: "03123456789",
+    accountName: "adnan tariq", // Updated Account Name
+    accountNumber: "03411167577", // Updated Account Number
   },
   jazzcash: {
     accountName: "Rupay Growth Investment",
