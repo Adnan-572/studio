@@ -4,97 +4,98 @@
 
 body {
   font-family: Arial, Helvetica, sans-serif;
-  /* Apply the dark gradient background directly */
-  background: linear-gradient(to bottom, hsl(220, 15%, 5%), hsl(220, 70%, 15%));
-  /* Add a subtle texture/pattern - placeholder using a simple noise pattern */
-  background-image: linear-gradient(to bottom, hsl(220, 15%, 5%), hsl(220, 70%, 15%)),
-                    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23ffffff' fill-opacity='0.03' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
+  /* Apply the dark black to green gradient background */
+  background: linear-gradient(to bottom, hsl(0, 0%, 5%), hsl(134, 60%, 10%)); /* Black to Dark Green */
+  /* Keep subtle texture */
+  background-image: linear-gradient(to bottom, hsl(0, 0%, 5%), hsl(134, 60%, 10%)),
+                    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23ffffff' fill-opacity='0.02' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
 }
 
 @layer base {
   :root {
-    /* Dark Theme as Default (black to deep blue gradient applied to body) */
-    --background: 220 50% 5%; /* Very dark blue - base for components */
-    --foreground: 210 40% 98%; /* Light gray/off-white text */
+    /* Dark Theme: Black & Green */
+    --background: 140 20% 5%; /* Very dark desaturated green (near black) */
+    --foreground: 140 15% 98%; /* Light gray/off-white text */
 
-    --card: 220 40% 10%; /* Slightly lighter dark blue for cards */
-    --card-foreground: 210 40% 95%; /* Light text on cards */
+    --card: 140 25% 8%; /* Slightly lighter dark green/black for cards */
+    --card-foreground: 140 15% 95%; /* Light text on cards */
 
-    --popover: 220 40% 8%; /* Darker popover */
-    --popover-foreground: 210 40% 95%;
+    --popover: 140 25% 6%; /* Darker popover */
+    --popover-foreground: 140 15% 95%;
 
-    --primary: 134 61% 45%; /* Keep green, slightly brighter */
+    --primary: 134 61% 45%; /* Main vibrant green */
     --primary-foreground: 210 40% 98%; /* White on primary */
 
-    --secondary: 210 20% 20%; /* Dark gray for secondary elements */
-    --secondary-foreground: 210 40% 90%; /* Lighter text on secondary */
+    --secondary: 140 15% 15%; /* Muted dark green/gray */
+    --secondary-foreground: 140 20% 85%; /* Lighter text on secondary */
 
-    --muted: 210 20% 15%; /* Darker muted background */
-    --muted-foreground: 210 30% 65%; /* Dimmed text */
+    --muted: 140 15% 10%; /* Darker muted background */
+    --muted-foreground: 140 10% 65%; /* Dimmed text */
 
-    --accent: 211 100% 55%; /* Keep blue, slightly brighter */
+    --accent: 150 70% 50%; /* Brighter accent green/teal */
     --accent-foreground: 210 40% 98%; /* White on accent */
 
-    --destructive: 0 70% 50%; /* Adjusted red for dark mode */
+    --destructive: 0 70% 50%; /* Keep red for destructive actions */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 210 20% 30%; /* Darker border */
-    --input: 210 20% 25%; /* Darker input background */
-    --ring: 211 100% 55%; /* Blue for focus rings */
+    --border: 140 15% 25%; /* Dark green/gray border */
+    --input: 140 15% 20%; /* Darker input background */
+    --ring: 134 61% 45%; /* Use primary green for focus rings */
 
     --chart-1: 134 61% 45%; /* Green */
-    --chart-2: 211 100% 55%; /* Blue */
-    --chart-3: 43 80% 60%; /* Adjusted Yellow/Orange */
-    --chart-4: 27 90% 65%; /* Adjusted Orange/Red */
-    --chart-5: 180 70% 45%; /* Cyan/Teal */
+    --chart-2: 150 70% 50%; /* Accent Green/Teal */
+    --chart-3: 90 50% 55%;  /* Lime Green */
+    --chart-4: 211 100% 55%; /* Blue (for contrast if needed) */
+    --chart-5: 43 80% 60%; /* Yellow/Orange (for contrast if needed) */
+
 
     --radius: 0.5rem;
 
-    /* Sidebar specific dark theme variables */
-    --sidebar-background: 220 40% 10%; /* Match card background */
-    --sidebar-foreground: 210 40% 95%; /* Match card foreground */
+    /* Sidebar specific dark theme variables - adjusted for green */
+    --sidebar-background: 140 25% 8%; /* Match card background */
+    --sidebar-foreground: 140 15% 95%; /* Match card foreground */
     --sidebar-primary: 134 61% 45%; /* Match primary */
     --sidebar-primary-foreground: 210 40% 98%; /* Match primary foreground */
-    --sidebar-accent: 211 100% 55%; /* Match accent */
+    --sidebar-accent: 150 70% 50%; /* Match accent */
     --sidebar-accent-foreground: 210 40% 98%; /* Match accent foreground */
-    --sidebar-border: 210 20% 30%; /* Match border */
-    --sidebar-ring: 211 100% 55%; /* Match ring */
+    --sidebar-border: 140 15% 25%; /* Match border */
+    --sidebar-ring: 134 61% 45%; /* Match ring */
   }
 
   .dark {
      /* Use the same dark theme variables defined in :root */
-    --background: 220 50% 5%;
-    --foreground: 210 40% 98%;
-    --card: 220 40% 10%;
-    --card-foreground: 210 40% 95%;
-    --popover: 220 40% 8%;
-    --popover-foreground: 210 40% 95%;
+    --background: 140 20% 5%;
+    --foreground: 140 15% 98%;
+    --card: 140 25% 8%;
+    --card-foreground: 140 15% 95%;
+    --popover: 140 25% 6%;
+    --popover-foreground: 140 15% 95%;
     --primary: 134 61% 45%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 20% 20%;
-    --secondary-foreground: 210 40% 90%;
-    --muted: 210 20% 15%;
-    --muted-foreground: 210 30% 65%;
-    --accent: 211 100% 55%;
+    --secondary: 140 15% 15%;
+    --secondary-foreground: 140 20% 85%;
+    --muted: 140 15% 10%;
+    --muted-foreground: 140 10% 65%;
+    --accent: 150 70% 50%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 210 20% 30%;
-    --input: 210 20% 25%;
-    --ring: 211 100% 55%;
+    --border: 140 15% 25%;
+    --input: 140 15% 20%;
+    --ring: 134 61% 45%;
     --chart-1: 134 61% 45%;
-    --chart-2: 211 100% 55%;
-    --chart-3: 43 80% 60%;
-    --chart-4: 27 90% 65%;
-    --chart-5: 180 70% 45%;
-    --sidebar-background: 220 40% 10%;
-    --sidebar-foreground: 210 40% 95%;
+    --chart-2: 150 70% 50%;
+    --chart-3: 90 50% 55%;
+    --chart-4: 211 100% 55%;
+    --chart-5: 43 80% 60%;
+    --sidebar-background: 140 25% 8%;
+    --sidebar-foreground: 140 15% 95%;
     --sidebar-primary: 134 61% 45%;
     --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 211 100% 55%;
+    --sidebar-accent: 150 70% 50%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 210 20% 30%;
-    --sidebar-ring: 211 100% 55%;
+    --sidebar-border: 140 15% 25%;
+    --sidebar-ring: 134 61% 45%;
   }
 }
 
