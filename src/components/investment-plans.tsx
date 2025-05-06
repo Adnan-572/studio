@@ -531,7 +531,7 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                 {/* Upload Proof */}
                 <div className="space-y-2">
                     <Label htmlFor="transaction-proof" className="text-base font-semibold flex items-center gap-2">
-                        <UploadCloud className="h-5 w-5" /> Upload Transaction Proof
+                        <UploadCloud className="h-5 w-5" /> Upload Transaction Screenshot
                     </Label>
                     <div className="flex items-center space-x-2">
                         <Input
@@ -574,7 +574,7 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                       {transactionProof && (
                         <div className="flex items-center text-xs text-green-600 dark:text-green-400 mt-1">
                             <CheckCircle className="h-4 w-4 mr-1" />
-                            Screenshot selected. Ready to submit.
+                            Screenshot selected. Click Submit below.
                         </div>
                      )}
                 </div>
@@ -593,7 +593,7 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
                     </>
-                   ) : "Submit Proof"}
+                   ) : "Submit Uploaded Screenshot"}
                 </Button>
               </DialogFooter>
             </>
