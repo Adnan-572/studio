@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle } from "lucide-react"; // Added CheckCircle
+import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle, X } from "lucide-react"; // Added X icon
 import { Separator } from '@/components/ui/separator';
 import { addPendingInvestment } from '@/lib/investment-store'; // Import store function
 
@@ -603,4 +603,3 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
     </>
   );
 }
-
