@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2 } from "lucide-react";
+import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle } from "lucide-react"; // Added CheckCircle
 import { Separator } from '@/components/ui/separator';
 import { addPendingInvestment } from '@/lib/investment-store'; // Import store function
 
@@ -210,7 +210,6 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
 interface InvestmentPlansProps {
   userId: string; // Required user ID
   userName: string; // Required user name
- // onInvestSuccess: (plan: Plan) => void; // Callback function REMOVED - Handled internally now
 }
 
 export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
@@ -219,7 +218,7 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [investmentAmount, setInvestmentAmount] = React.useState<string>(''); // Amount user wants to invest
   const [transactionProof, setTransactionProof] = React.useState<File | null>(null);
-   const [transactionProofDataUrl, setTransactionProofDataUrl] = React.useState<string | null>(null); // For storing the proof as Data URL
+  const [transactionProofDataUrl, setTransactionProofDataUrl] = React.useState<string | null>(null); // For storing the proof as Data URL
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [amountError, setAmountError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -263,6 +262,9 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
    };
 
    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+     setTransactionProof(null); // Reset previous proof/message on new selection
+     setTransactionProofDataUrl(null);
+
      if (event.target.files && event.target.files[0]) {
        const file = event.target.files[0];
        if (file.size > 5 * 1024 * 1024) { // 5MB limit
@@ -271,8 +273,6 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
            title: "File Too Large",
            description: "Please upload an image smaller than 5MB.",
          });
-         setTransactionProof(null);
-         setTransactionProofDataUrl(null);
          if (fileInputRef.current) fileInputRef.current.value = "";
          return;
        }
@@ -282,19 +282,16 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
        reader.onloadend = () => {
           setTransactionProof(file);
           setTransactionProofDataUrl(reader.result as string);
+          // Optionally show a toast or message here indicating successful selection/read
+          // toast({ title: "Screenshot Selected", description: file.name, variant: 'default', duration: 3000 });
        }
        reader.onerror = (error) => {
            console.error("Error reading file:", error);
            toast({ variant: "destructive", title: "Error Reading File", description: "Could not process the selected file." });
-           setTransactionProof(null);
-           setTransactionProofDataUrl(null);
            if (fileInputRef.current) fileInputRef.current.value = "";
        }
        reader.readAsDataURL(file);
 
-     } else {
-       setTransactionProof(null);
-       setTransactionProofDataUrl(null);
      }
    };
 
@@ -313,11 +310,11 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
      }
 
 
-    if (!transactionProofDataUrl) { // Check for Data URL
+    if (!transactionProofDataUrl) { // Check for Data URL (which means file was selected and read)
       toast({
         variant: "destructive",
         title: "Upload Required",
-        description: "Please upload your transaction proof screenshot.",
+        description: "Please select and upload your transaction proof screenshot.",
       });
       return;
     }
@@ -340,7 +337,6 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
             transactionProofDataUrl: transactionProofDataUrl, // Use the data URL
             submissionDate: new Date().toISOString(),
             status: 'pending' as const, // Initial status
-            // approvalDate: null, // No approval date yet
         };
 
          console.log("Submitting investment proof:", submissionData);
@@ -357,10 +353,6 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
         });
 
         setIsModalOpen(false); // Close modal on success
-
-        // NO LONGER NEEDED: Parent page (Home) will detect the pending state from the store
-        // onInvestSuccess(selectedPlan);
-
 
     } catch (error) {
          console.error("Submission error:", error);
@@ -538,25 +530,53 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
 
                 {/* Upload Proof */}
                 <div className="space-y-2">
-                  <Label htmlFor="transaction-proof" className="text-base font-semibold flex items-center gap-2">
-                     <UploadCloud className="h-5 w-5"/> Upload Transaction Proof
-                  </Label>
-                  <Input
-                    id="transaction-proof"
-                    type="file"
-                    ref={fileInputRef}
-                    accept="image/png, image/jpeg, image/jpg"
-                    onChange={handleFileChange}
-                    className="file:border-0 file:bg-primary file:text-primary-foreground file:hover:bg-primary/90 file:mr-4 file:py-2 file:px-4 file:rounded-md file:text-sm file:font-semibold cursor-pointer"
-                    required
-                    aria-describedby="file-help-text"
-                  />
-                   {transactionProof && (
-                     <p className="text-xs text-muted-foreground">Selected file: {transactionProof.name}</p>
-                   )}
-                  <p id="file-help-text" className="text-xs text-muted-foreground">
-                    Please upload a clear screenshot of your successful transaction (max 5MB, JPG/PNG).
-                  </p>
+                    <Label htmlFor="transaction-proof" className="text-base font-semibold flex items-center gap-2">
+                        <UploadCloud className="h-5 w-5" /> Upload Transaction Proof
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                        <Input
+                            id="transaction-proof"
+                            type="file"
+                            ref={fileInputRef}
+                            accept="image/png, image/jpeg, image/jpg"
+                            onChange={handleFileChange}
+                            className={`flex-grow file:border-0 file:bg-primary file:text-primary-foreground file:hover:bg-primary/90 file:mr-4 file:py-2 file:px-4 file:rounded-md file:text-sm file:font-semibold cursor-pointer ${
+                                transactionProof ? 'hidden' : '' // Hide input if file is selected
+                            }`}
+                            required
+                            aria-describedby="file-help-text"
+                        />
+                         {transactionProof && (
+                            <div className="flex items-center justify-between flex-grow rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                                <span className="truncate flex-grow mr-2">{transactionProof.name}</span>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-destructive hover:bg-destructive/10"
+                                    onClick={() => {
+                                        setTransactionProof(null);
+                                        setTransactionProofDataUrl(null);
+                                        if (fileInputRef.current) fileInputRef.current.value = "";
+                                    }}
+                                    title="Remove file"
+                                >
+                                    <X className="h-4 w-4" />
+                                    <span className="sr-only">Remove file</span>
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                    {!transactionProof && (
+                        <p id="file-help-text" className="text-xs text-muted-foreground">
+                             Please select a clear screenshot of your successful transaction (max 5MB, JPG/PNG).
+                         </p>
+                    )}
+                      {transactionProof && (
+                        <div className="flex items-center text-xs text-green-600 dark:text-green-400 mt-1">
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Screenshot selected. Ready to submit.
+                        </div>
+                     )}
                 </div>
               </div>
               <DialogFooter>
@@ -583,3 +603,4 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
     </>
   );
 }
+
