@@ -1,127 +1,134 @@
 
-
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation'; // For redirection
 import {
   getAllPendingInvestments,
   approveInvestment,
   rejectInvestment,
-  getAllApprovedInvestments, // Import function to get all approved investments
+  getAllApprovedInvestments,
   type InvestmentSubmission,
 } from '@/lib/investment-store';
 import {
-  getPendingWithdrawalRequests, // Import function to get pending withdrawals
-  updateWithdrawalStatus,      // Import function to update withdrawal status
+  getPendingWithdrawalRequests,
+  updateWithdrawalStatus,    
   type WithdrawalRequest,
 } from '@/lib/withdrawal-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, differenceInDays, isPast } from 'date-fns'; // Added date functions
-import Image from 'next/image'; // Use next/image for optimization
-import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Clock, Ban, Wallet, ListChecks, UserCheck } from 'lucide-react'; // Added icons
+import { format, addDays, isPast } from 'date-fns';
+import Image from 'next/image';
+import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Ban, ShieldAlert } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogFooter,
   DialogClose
 } from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input'; // For transaction ID/reason
-import { Label } from '@/components/ui/label'; // For transaction ID/reason
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge'; // Import Badge
+import { Badge } from '@/components/ui/badge';
+import { getCurrentUser, type User } from '@/lib/auth-store'; // Import auth functions
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
-// Helper to format currency
+
 const formatCurrency = (amount: number): string => {
   if (!Number.isFinite(amount)) {
     return 'PKR 0.00';
   }
-  // Consistent formatting (0 decimal places for investments, 2 for withdrawals)
   return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: amount > 1000 ? 0 : 2, maximumFractionDigits: 2 })}`;
 };
 
 
 export default function DeveloperDashboardPage() {
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
+  const router = useRouter();
+
   const [pendingInvestments, setPendingInvestments] = React.useState<InvestmentSubmission[]>([]);
-  const [activeInvestments, setActiveInvestments] = React.useState<InvestmentSubmission[]>([]); // State for active investments
+  const [activeInvestments, setActiveInvestments] = React.useState<InvestmentSubmission[]>([]);
   const [pendingWithdrawals, setPendingWithdrawals] = React.useState<WithdrawalRequest[]>([]);
   const [isLoadingInvestments, setIsLoadingInvestments] = React.useState(true);
-  const [isLoadingActive, setIsLoadingActive] = React.useState(true); // Loading state for active investments
+  const [isLoadingActive, setIsLoadingActive] = React.useState(true);
   const [isLoadingWithdrawals, setIsLoadingWithdrawals] = React.useState(true);
   const [isProcessingInvestment, setIsProcessingInvestment] = React.useState<Record<string, boolean>>({});
-  const [isProcessingWithdrawal, setIsProcessingWithdrawal] = React.useState<Record<string, boolean>>({}); // Track withdrawal processing
-  const [selectedImage, setSelectedImage] = React.useState<string | null>(null); // For image modal
+  const [isProcessingWithdrawal, setIsProcessingWithdrawal] = React.useState<Record<string, boolean>>({});
+  const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
   const [withdrawalAction, setWithdrawalAction] = React.useState<{ type: 'complete' | 'reject', request: WithdrawalRequest | null }>({ type: 'complete', request: null });
   const [transactionId, setTransactionId] = React.useState('');
   const [rejectionReason, setRejectionReason] = React.useState('');
 
   const { toast } = useToast();
 
-  // Fetch Pending Investments
+  React.useEffect(() => {
+    const user = getCurrentUser();
+    if (user && user.userType === 'developer') {
+      setCurrentUser(user);
+    } else {
+      // Optionally redirect or just show access denied
+      // router.push('/'); // Redirect to home if not developer
+    }
+    setIsCheckingAuth(false);
+  }, [router]);
+
+
   const fetchPendingInvestments = React.useCallback(() => {
+    if (!currentUser) return;
     setIsLoadingInvestments(true);
     const pending = getAllPendingInvestments();
-    console.log("Fetched pending investments:", pending);
     setPendingInvestments(pending);
     setIsLoadingInvestments(false);
-  }, []);
+  }, [currentUser]);
 
-  // Fetch Active Investments
   const fetchActiveInvestments = React.useCallback(() => {
+    if (!currentUser) return;
     setIsLoadingActive(true);
-    const active = getAllApprovedInvestments(); // Fetch all approved
-    console.log("Fetched active investments:", active);
+    const active = getAllApprovedInvestments();
     setActiveInvestments(active);
     setIsLoadingActive(false);
-  }, []);
+  }, [currentUser]);
 
-  // Fetch Pending Withdrawals
   const fetchPendingWithdrawals = React.useCallback(() => {
+    if (!currentUser) return;
     setIsLoadingWithdrawals(true);
     const pending = getPendingWithdrawalRequests();
-    console.log("Fetched pending withdrawals:", pending);
     setPendingWithdrawals(pending);
     setIsLoadingWithdrawals(false);
-  }, []);
+  }, [currentUser]);
 
   React.useEffect(() => {
-    fetchPendingInvestments();
-    fetchActiveInvestments(); // Fetch active investments on mount
-    fetchPendingWithdrawals();
+    if (currentUser) { // Only fetch if user is a developer
+      fetchPendingInvestments();
+      fetchActiveInvestments();
+      fetchPendingWithdrawals();
 
-    // Refresh every 15 seconds
-    const interval = setInterval(() => {
-        fetchPendingInvestments();
-        fetchActiveInvestments();
-        fetchPendingWithdrawals();
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [fetchPendingInvestments, fetchActiveInvestments, fetchPendingWithdrawals]);
+      const interval = setInterval(() => {
+          fetchPendingInvestments();
+          fetchActiveInvestments();
+          fetchPendingWithdrawals();
+      }, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser, fetchPendingInvestments, fetchActiveInvestments, fetchPendingWithdrawals]);
 
 
-  // --- Investment Handlers ---
   const handleApproveInvestment = async (submissionId: string) => {
     setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: true }));
     try {
       await approveInvestment(submissionId);
-      toast({
-        title: 'Investment Approved',
-        description: `Investment ID ${submissionId} has been approved.`,
-      });
-      fetchPendingInvestments(); // Refresh the list
-      fetchActiveInvestments(); // Refresh active list as well
+      toast({ title: 'Investment Approved', description: `Investment ID ${submissionId} has been approved.` });
+      fetchPendingInvestments(); 
+      fetchActiveInvestments();
     } catch (error) {
       console.error('Approval error:', error);
-      toast({
-        title: 'Approval Failed', description: `Could not approve investment ${submissionId}.`, variant: 'destructive',
-      });
+      toast({ title: 'Approval Failed', description: `Could not approve investment ${submissionId}.`, variant: 'destructive' });
     } finally {
       setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: false }));
     }
@@ -131,24 +138,19 @@ export default function DeveloperDashboardPage() {
     setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: true }));
     try {
       await rejectInvestment(submissionId);
-      toast({
-        title: 'Investment Rejected', description: `Investment ID ${submissionId} has been rejected.`, variant: 'destructive',
-      });
-      fetchPendingInvestments(); // Refresh the list
+      toast({ title: 'Investment Rejected', description: `Investment ID ${submissionId} has been rejected.`, variant: 'destructive' });
+      fetchPendingInvestments();
     } catch (error) {
       console.error('Rejection error:', error);
-      toast({
-        title: 'Rejection Failed', description: `Could not reject investment ${submissionId}.`, variant: 'destructive',
-      });
+      toast({ title: 'Rejection Failed', description: `Could not reject investment ${submissionId}.`, variant: 'destructive' });
     } finally {
       setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: false }));
     }
   };
 
-  // --- Withdrawal Handlers ---
   const openWithdrawalActionModal = (type: 'complete' | 'reject', request: WithdrawalRequest) => {
       setWithdrawalAction({ type, request });
-      setTransactionId(''); // Reset fields
+      setTransactionId(''); 
       setRejectionReason('');
   }
 
@@ -196,16 +198,33 @@ export default function DeveloperDashboardPage() {
        }
    };
 
+  const openImageModal = (imageDataUrl: string) => setSelectedImage(imageDataUrl);
+  const closeImageModal = () => setSelectedImage(null);
 
-  // --- Image Modal ---
-  const openImageModal = (imageDataUrl: string) => {
-    setSelectedImage(imageDataUrl);
-  };
+  if (isCheckingAuth) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="ml-4 text-lg">Verifying access...</p>
+      </div>
+    );
+  }
 
-  const closeImageModal = () => {
-    setSelectedImage(null);
-  };
-
+  if (!currentUser) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Alert variant="destructive" className="max-w-lg">
+          <ShieldAlert className="h-5 w-5" />
+          <AlertTitle className="text-xl font-semibold">Access Denied</AlertTitle>
+          <AlertDescription>
+            You do not have permission to view this page. This area is for developers only.
+            Please login with a developer account or contact support if you believe this is an error.
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => router.push('/')} className="mt-6">Go to Homepage</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -214,13 +233,12 @@ export default function DeveloperDashboardPage() {
       </h1>
 
       <Tabs defaultValue="pending-investments" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6"> {/* Adjusted grid cols */}
+          <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="pending-investments">Pending Investments ({pendingInvestments.length})</TabsTrigger>
-              <TabsTrigger value="active-investments">Active Investments ({activeInvestments.length})</TabsTrigger> {/* New Tab */}
+              <TabsTrigger value="active-investments">Active Investments ({activeInvestments.length})</TabsTrigger>
               <TabsTrigger value="pending-withdrawals">Pending Withdrawals ({pendingWithdrawals.length})</TabsTrigger>
           </TabsList>
 
-          {/* Pending Investments Tab */}
           <TabsContent value="pending-investments">
               <Card>
                   <CardHeader>
@@ -306,7 +324,6 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
-          {/* Active Investments Tab */}
           <TabsContent value="active-investments">
               <Card>
                   <CardHeader>
@@ -363,7 +380,6 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
-          {/* Pending Withdrawals Tab */}
           <TabsContent value="pending-withdrawals">
                <Card>
                   <CardHeader>
@@ -416,20 +432,20 @@ export default function DeveloperDashboardPage() {
                                                   {isProcessingWithdrawal[request.id!] ? (
                                                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                                                   ) : (
-                                                      <Send className="mr-1 h-4 w-4" /> // Use Send icon
+                                                      <Send className="mr-1 h-4 w-4" />
                                                   )}
                                                   Complete
                                               </Button>
                                                <Button
                                                   variant="destructive"
                                                   size="sm"
-                                                  onClick={() => openWithdrawalActionModal('reject', request)} // Open reject modal
+                                                  onClick={() => openWithdrawalActionModal('reject', request)}
                                                   disabled={isProcessingWithdrawal[request.id!]}
                                               >
                                                   {isProcessingWithdrawal[request.id!] ? (
                                                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                                                   ) : (
-                                                      <Ban className="mr-1 h-4 w-4" /> // Use Ban icon
+                                                      <Ban className="mr-1 h-4 w-4" />
                                                   )}
                                                   Reject
                                               </Button>
@@ -444,8 +460,6 @@ export default function DeveloperDashboardPage() {
           </TabsContent>
       </Tabs>
 
-
-       {/* Image Viewer Modal */}
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && closeImageModal()}>
         <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
           <DialogHeader>
@@ -457,9 +471,9 @@ export default function DeveloperDashboardPage() {
               <Image
                 src={selectedImage}
                 alt="Transaction Proof"
-                fill // Use fill layout
-                style={{ objectFit: 'contain' }} // Ensure image fits within container
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" // Responsive sizes
+                fill 
+                style={{ objectFit: 'contain' }} 
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
             )}
           </div>
@@ -467,8 +481,8 @@ export default function DeveloperDashboardPage() {
              {selectedImage && (
                 <a
                     href={selectedImage}
-                    download={`transaction_proof_${Date.now()}.png`} // Suggest a filename
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3" // Matches button sm style
+                    download={`transaction_proof_${Date.now()}.png`}
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3"
                 >
                   <Download className="mr-2 h-4 w-4"/> Download Image
                 </a>
@@ -482,7 +496,6 @@ export default function DeveloperDashboardPage() {
         </DialogContent>
       </Dialog>
 
-       {/* Withdrawal Action Modal */}
         <Dialog open={!!withdrawalAction.request} onOpenChange={(open) => !open && closeWithdrawalActionModal()}>
             <DialogContent className="sm:max-w-[450px]">
                 <DialogHeader>
@@ -550,8 +563,6 @@ export default function DeveloperDashboardPage() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-
-
     </div>
   );
 }

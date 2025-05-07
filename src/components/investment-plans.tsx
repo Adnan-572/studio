@@ -9,31 +9,28 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle, X } from "lucide-react"; // Added X icon
+import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle, X, LogIn } from "lucide-react";
 import { Separator } from '@/components/ui/separator';
-import { addPendingInvestment } from '@/lib/investment-store'; // Import store function
+import { addPendingInvestment } from '@/lib/investment-store';
 
-// Export Plan interface if not already done elsewhere
 export interface Plan {
   title: string;
   icon: React.ElementType;
-  investmentRange: string; // Display range
+  investmentRange: string; 
   duration: number;
   dailyProfitMin: number;
   dailyProfitMax: number;
   badge?: string;
   primary?: boolean;
-  // Investment amount is now potentially variable, use min/max for validation
   minInvestment: number;
   maxInvestment: number;
-  // Removed fixed investmentAmount, calculated dynamically or set specifically for basic plan
 }
 
 const plansData: Omit<Plan, 'investmentAmount'>[] = [
    {
     title: "Basic Plan",
     icon: TrendingUp,
-    investmentRange: "PKR 500", // Specific amount shown
+    investmentRange: "PKR 500",
     duration: 15,
     dailyProfitMin: 1.0,
     dailyProfitMax: 1.5,
@@ -84,17 +81,15 @@ const plansData: Omit<Plan, 'investmentAmount'>[] = [
   },
 ];
 
-// Enrich plans with default investment amount for calculator (e.g., min or a typical value)
 const plans: Plan[] = plansData.map(p => ({
   ...p,
-  // Default calculator amount to minInvestment, except for Basic Plan
   investmentAmount: p.title === "Basic Plan" ? p.minInvestment : p.minInvestment,
 }));
 
 const paymentDetails = {
   easypaisa: {
-    accountName: "adnan tariq", // Updated Account Name
-    accountNumber: "03411167577", // Updated Account Number
+    accountName: "adnan tariq",
+    accountNumber: "03411167577",
   },
   jazzcash: {
     accountName: "Rupay Growth Investment",
@@ -106,12 +101,10 @@ const formatCurrency = (amount: number) => {
   if (!Number.isFinite(amount)) {
     return 'PKR 0.00';
   }
-  return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; // No decimal places for display
+  return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
-// Profit Calculator Component
 const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
-    // Initialize amount with the plan's *minimum* investment for flexibility
     const [amount, setAmount] = React.useState<string>(plan.minInvestment.toString());
     const [dailyProfitMin, setDailyProfitMin] = React.useState<number>(0);
     const [dailyProfitMax, setDailyProfitMax] = React.useState<number>(0);
@@ -120,7 +113,7 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
     const [isValidAmount, setIsValidAmount] = React.useState<boolean>(true);
 
     React.useEffect(() => {
-        const investmentAmount = parseInt(amount, 10); // Use parseInt for whole numbers
+        const investmentAmount = parseInt(amount, 10);
         if (isNaN(investmentAmount) || investmentAmount < plan.minInvestment || investmentAmount > plan.maxInvestment) {
             setIsValidAmount(false);
             setDailyProfitMin(0);
@@ -145,9 +138,7 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        // Allow only digits, handle empty string for clearing
         if (value === '' || /^[0-9]*$/.test(value)) {
-           // Prevent leading zeros unless it's just '0'
            if (value.length > 1 && value.startsWith('0')) {
              setAmount(value.substring(1));
            } else {
@@ -171,15 +162,12 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
             </Label>
             <Input
                 id={`calc-amount-${plan.title}`}
-                type="text" // Use text to better handle input filtering
-                inputMode="numeric" // Hint for numeric keyboard on mobile
+                type="text"
+                inputMode="numeric"
                 value={amount}
                 onChange={handleAmountChange}
                 placeholder={`Amount (${formatCurrency(plan.minInvestment)} - ${formatCurrency(plan.maxInvestment)})`}
                 className={`h-8 text-sm mb-2 ${!isValidAmount && amount !== '' ? 'border-destructive ring-destructive focus-visible:ring-destructive' : ''}`}
-                // min={plan.minInvestment} // Min/max not strictly enforced on text input
-                // max={plan.maxInvestment}
-                // step="1"
             />
             {!isValidAmount && amount !== '' && (
                  <p className="text-xs text-destructive mb-2">
@@ -208,24 +196,33 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
 };
 
 interface InvestmentPlansProps {
-  userId: string; // Required user ID
-  userName: string; // Required user name
+  userId: string | null;
+  userName: string | null;
+  isAuthenticated: boolean;
 }
 
-export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
+export function InvestmentPlans({ userId, userName, isAuthenticated }: InvestmentPlansProps) {
   const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [investmentAmount, setInvestmentAmount] = React.useState<string>(''); // Amount user wants to invest
+  const [investmentAmount, setInvestmentAmount] = React.useState<string>('');
   const [transactionProof, setTransactionProof] = React.useState<File | null>(null);
-  const [transactionProofDataUrl, setTransactionProofDataUrl] = React.useState<string | null>(null); // For storing the proof as Data URL
+  const [transactionProofDataUrl, setTransactionProofDataUrl] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [amountError, setAmountError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleInvestClick = (plan: Plan) => {
+    if (!isAuthenticated) {
+        toast({
+            title: "Login Required",
+            description: "Please login or register to invest in a plan.",
+            variant: "destructive",
+            action: <Button onClick={() => { /* TODO: Trigger login modal from layout */ }}>Login</Button>
+        });
+        return;
+    }
     setSelectedPlan(plan);
-    // Reset amount for each modal opening, prefill basic plan amount
     setInvestmentAmount(plan.title === "Basic Plan" ? plan.minInvestment.toString() : '');
     setAmountError(null);
     setTransactionProof(null);
@@ -240,14 +237,10 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
      const value = e.target.value;
      if (value === '' || /^[0-9]*$/.test(value)) {
         let finalValue = value;
-         // Prevent leading zeros unless it's just '0'
         if (value.length > 1 && value.startsWith('0')) {
           finalValue = value.substring(1);
         }
-
         setInvestmentAmount(finalValue);
-
-        // Validation
         if (selectedPlan && finalValue !== '') {
              const numAmount = parseInt(finalValue, 10);
              if (isNaN(numAmount) || numAmount < selectedPlan.minInvestment || numAmount > selectedPlan.maxInvestment) {
@@ -256,34 +249,25 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                  setAmountError(null);
              }
         } else {
-            setAmountError(null); // Clear error if empty
+            setAmountError(null);
         }
      }
    };
 
    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-     setTransactionProof(null); // Reset previous proof/message on new selection
+     setTransactionProof(null);
      setTransactionProofDataUrl(null);
-
      if (event.target.files && event.target.files[0]) {
        const file = event.target.files[0];
        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-         toast({
-           variant: "destructive",
-           title: "File Too Large",
-           description: "Please upload an image smaller than 5MB.",
-         });
+         toast({ variant: "destructive", title: "File Too Large", description: "Please upload an image smaller than 5MB." });
          if (fileInputRef.current) fileInputRef.current.value = "";
          return;
        }
-
-       // Read file as Data URL
        const reader = new FileReader();
        reader.onloadend = () => {
           setTransactionProof(file);
           setTransactionProofDataUrl(reader.result as string);
-          // Optionally show a toast or message here indicating successful selection/read
-          // toast({ title: "Screenshot Selected", description: file.name, variant: 'default', duration: 3000 });
        }
        reader.onerror = (error) => {
            console.error("Error reading file:", error);
@@ -291,76 +275,52 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
            if (fileInputRef.current) fileInputRef.current.value = "";
        }
        reader.readAsDataURL(file);
-
      }
    };
 
-
   const handleSubmitProof = async () => {
-     // --- Validation ---
-    if (!selectedPlan) return; // Should not happen, but good practice
-
+    if (!selectedPlan || !userId || !userName) {
+        toast({ variant: "destructive", title: "Error", description: "User not identified. Please login again." });
+        return;
+    }
      const finalAmount = parseInt(investmentAmount, 10);
       if (isNaN(finalAmount) || finalAmount < selectedPlan.minInvestment || finalAmount > selectedPlan.maxInvestment) {
          setAmountError(`Amount must be between ${formatCurrency(selectedPlan.minInvestment)} and ${formatCurrency(selectedPlan.maxInvestment)}.`);
          toast({ variant: "destructive", title: "Invalid Amount", description: amountError });
          return;
      } else {
-         setAmountError(null); // Clear error if validation passes now
+         setAmountError(null);
      }
-
-
-    if (!transactionProofDataUrl) { // Check for Data URL (which means file was selected and read)
-      toast({
-        variant: "destructive",
-        title: "Upload Required",
-        description: "Please select and upload your transaction proof screenshot.",
-      });
+    if (!transactionProofDataUrl) {
+      toast({ variant: "destructive", title: "Upload Required", description: "Please select and upload your transaction proof screenshot." });
       return;
     }
      if (amountError) {
        toast({ variant: "destructive", title: "Invalid Amount", description: amountError });
        return;
      }
-    // --- End Validation ---
-
-
     setIsSubmitting(true);
-
     try {
-        // Prepare submission data
         const submissionData = {
-            ...selectedPlan, // Spread the selected plan details
-            investmentAmount: finalAmount, // Use the validated, final amount
+            ...selectedPlan,
+            investmentAmount: finalAmount,
             userId: userId,
             userName: userName,
-            transactionProofDataUrl: transactionProofDataUrl, // Use the data URL
+            transactionProofDataUrl: transactionProofDataUrl,
             submissionDate: new Date().toISOString(),
-            status: 'pending' as const, // Initial status
+            status: 'pending' as const,
         };
-
-         console.log("Submitting investment proof:", submissionData);
-
-
-        // Simulate API call to store pending investment
+        console.log("Submitting investment proof:", submissionData);
         await addPendingInvestment(submissionData);
-
-
         toast({
             title: "Proof Submitted Successfully",
             description: `Your investment proof for the ${selectedPlan.title} (${formatCurrency(finalAmount)}) is pending approval.`,
             variant: 'default',
         });
-
-        setIsModalOpen(false); // Close modal on success
-
+        setIsModalOpen(false);
     } catch (error) {
          console.error("Submission error:", error);
-        toast({
-            variant: "destructive",
-            title: "Submission Failed",
-            description: "There was an error submitting your proof. Please try again.",
-        });
+        toast({ variant: "destructive", title: "Submission Failed", description: "There was an error submitting your proof. Please try again." });
     } finally {
        setIsSubmitting(false);
     }
@@ -368,22 +328,12 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
 
    const copyToClipboard = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      toast({
-        title: "Copied!",
-        description: `${fieldName} copied to clipboard.`,
-        variant: "default",
-        duration: 2000,
-      });
+      toast({ title: "Copied!", description: `${fieldName} copied to clipboard.`, variant: "default", duration: 2000 });
     }).catch(err => {
       console.error(`Failed to copy ${fieldName}: `, err);
-      toast({
-        title: "Error",
-        description: `Failed to copy ${fieldName}.`,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: `Failed to copy ${fieldName}.`, variant: "destructive" });
     });
   };
-
 
   return (
     <>
@@ -399,10 +349,9 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
             ? `${totalReturnMinPercent.toFixed(1)}%`
             : `${totalReturnMinPercent.toFixed(1)}% – ${totalReturnMaxPercent.toFixed(1)}%`;
 
-          // Determine the display investment amount (fixed for basic, range otherwise)
            const displayInvestment = plan.title === "Basic Plan"
                 ? formatCurrency(plan.minInvestment)
-                : plan.investmentRange; // Use the range string for others
+                : plan.investmentRange;
 
 
           return (
@@ -428,7 +377,6 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                   <span className="text-muted-foreground">Total Return % (Est.):</span>
                   <span className="font-medium">{totalReturnText}</span>
                 </div>
-                 {/* Profit Calculator */}
                  <ProfitCalculator plan={plan} />
               </CardContent>
               <CardFooter>
@@ -436,9 +384,9 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                   className="w-full"
                   variant={plan.primary ? "default" : "outline"}
                   onClick={() => handleInvestClick(plan)}
+                  disabled={!isAuthenticated && plan.title !== "Basic Plan"} // Example: disable if not auth, except Basic
                 >
-                   {/* Button text consistent */}
-                   Invest Now
+                   {isAuthenticated ? "Invest Now" : <><LogIn className="mr-2 h-4 w-4" /> Login to Invest</>}
                 </Button>
               </CardFooter>
             </Card>
@@ -456,7 +404,6 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
          </Card>
       </div>
 
-      {/* Investment Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[525px]">
           {selectedPlan && (
@@ -468,19 +415,17 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-6 py-4">
-
-                {/* Investment Amount Input */}
                 <div className="space-y-2">
                    <Label htmlFor="investment-amount" className="text-base font-semibold">Investment Amount (PKR)</Label>
                    <Input
                        id="investment-amount"
-                       type="text" // Use text for custom handling
+                       type="text"
                        inputMode="numeric"
                        value={investmentAmount}
                        onChange={handleAmountChange}
                        placeholder={`e.g., ${selectedPlan.minInvestment}`}
                        className={amountError ? 'border-destructive' : ''}
-                       disabled={selectedPlan.title === "Basic Plan"} // Disable for basic plan
+                       disabled={selectedPlan.title === "Basic Plan"}
                        required
                    />
                    <p className="text-xs text-muted-foreground">
@@ -488,11 +433,8 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                    </p>
                    {amountError && <p className="text-xs text-destructive">{amountError}</p>}
                 </div>
-
-                {/* Payment Details */}
                 <div className="space-y-4">
                    <h3 className="font-semibold text-lg mb-2">Payment Accounts:</h3>
-                   {/* Easypaisa */}
                    <Card className="bg-muted/50">
                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
                             <CardTitle className="text-base font-medium">Easypaisa</CardTitle>
@@ -509,7 +451,6 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                             </div>
                        </CardContent>
                    </Card>
-                    {/* JazzCash */}
                    <Card className="bg-muted/50">
                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
                             <CardTitle className="text-base font-medium">JazzCash</CardTitle>
@@ -527,8 +468,6 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                        </CardContent>
                    </Card>
                 </div>
-
-                {/* Upload Proof */}
                 <div className="space-y-2">
                     <Label htmlFor="transaction-proof" className="text-base font-semibold flex items-center gap-2">
                         <UploadCloud className="h-5 w-5" /> Upload Transaction Screenshot
@@ -541,7 +480,7 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                             accept="image/png, image/jpeg, image/jpg"
                             onChange={handleFileChange}
                             className={`flex-grow file:border-0 file:bg-primary file:text-primary-foreground file:hover:bg-primary/90 file:mr-4 file:py-2 file:px-4 file:rounded-md file:text-sm file:font-semibold cursor-pointer ${
-                                transactionProof ? 'hidden' : '' // Hide input if file is selected
+                                transactionProof ? 'hidden' : ''
                             }`}
                             required
                             aria-describedby="file-help-text"
@@ -586,7 +525,7 @@ export function InvestmentPlans({ userId, userName }: InvestmentPlansProps) {
                 <Button
                   type="button"
                   onClick={handleSubmitProof}
-                  disabled={isSubmitting || !transactionProofDataUrl || !!amountError || investmentAmount === ''} // Also disable if amount empty or error
+                  disabled={isSubmitting || !transactionProofDataUrl || !!amountError || investmentAmount === ''}
                   aria-live="polite"
                 >
                   {isSubmitting ? (
