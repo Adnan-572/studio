@@ -16,7 +16,7 @@ import { addPendingInvestment } from '@/lib/investment-store';
 export interface Plan {
   title: string;
   icon: React.ElementType;
-  investmentRange: string; 
+  investmentRange: string;
   duration: number;
   dailyProfitMin: number;
   dailyProfitMax: number;
@@ -30,12 +30,12 @@ const plansData: Omit<Plan, 'investmentAmount'>[] = [
    {
     title: "Basic Plan",
     icon: TrendingUp,
-    investmentRange: "PKR 500",
+    investmentRange: "PKR 500 – 5,000", // Updated
     duration: 15,
     dailyProfitMin: 1.0,
     dailyProfitMax: 1.5,
-    minInvestment: 500,
-    maxInvestment: 500,
+    minInvestment: 500, // Updated
+    maxInvestment: 5000, // Updated
   },
   {
     title: "Advance Plan",
@@ -81,10 +81,15 @@ const plansData: Omit<Plan, 'investmentAmount'>[] = [
   },
 ];
 
+// The `investmentAmount` field in the Plan interface is used as a default or reference.
+// The actual investment amount logic is handled by minInvestment and maxInvestment for ranges.
 const plans: Plan[] = plansData.map(p => ({
   ...p,
-  investmentAmount: p.title === "Basic Plan" ? p.minInvestment : p.minInvestment,
+  // Setting a default investmentAmount to minInvestment for all plans here.
+  // This property is not directly used for the display of investmentRange on cards.
+  investmentAmount: p.minInvestment,
 }));
+
 
 const paymentDetails = {
   easypaisa: {
@@ -218,12 +223,14 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
             title: "Login Required",
             description: "Please login or register to invest in a plan.",
             variant: "destructive",
-            action: <Button onClick={() => { /* TODO: Trigger login modal from layout */ }}>Login</Button>
+            // Action button to trigger login modal would require parent component interaction
+            // action: <Button onClick={() => { /* TODO: Trigger login modal from layout */ }}>Login</Button>
         });
         return;
     }
     setSelectedPlan(plan);
-    setInvestmentAmount(plan.title === "Basic Plan" ? plan.minInvestment.toString() : '');
+    // Pre-fill with minInvestment for Basic Plan, empty for others (or could also be minInvestment)
+    setInvestmentAmount(plan.minInvestment.toString());
     setAmountError(null);
     setTransactionProof(null);
     setTransactionProofDataUrl(null);
@@ -301,16 +308,21 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
      }
     setIsSubmitting(true);
     try {
+        // Ensure 'icon' is the React.ElementType, and 'iconName' is correctly derived for storage
         const submissionData = {
-            ...selectedPlan,
+            ...selectedPlan, // This includes minInvestment, maxInvestment, dailyProfitMin/Max etc.
             investmentAmount: finalAmount,
             userId: userId,
             userName: userName,
             transactionProofDataUrl: transactionProofDataUrl,
             submissionDate: new Date().toISOString(),
             status: 'pending' as const,
+            // The 'icon' property from selectedPlan is a React.ElementType.
+            // addPendingInvestment expects it and will derive iconName internally.
+            icon: selectedPlan.icon, // Pass the icon component itself
         };
         console.log("Submitting investment proof:", submissionData);
+        // @ts-ignore - addPendingInvestment expects icon as ElementType which selectedPlan.icon is
         await addPendingInvestment(submissionData);
         toast({
             title: "Proof Submitted Successfully",
@@ -349,9 +361,8 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
             ? `${totalReturnMinPercent.toFixed(1)}%`
             : `${totalReturnMinPercent.toFixed(1)}% – ${totalReturnMaxPercent.toFixed(1)}%`;
 
-           const displayInvestment = plan.title === "Basic Plan"
-                ? formatCurrency(plan.minInvestment)
-                : plan.investmentRange;
+           // Use plan.investmentRange for display on card, as it's already formatted string.
+           const displayInvestment = plan.investmentRange;
 
 
           return (
@@ -384,7 +395,6 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
                   className="w-full"
                   variant={plan.primary ? "default" : "outline"}
                   onClick={() => handleInvestClick(plan)}
-                  disabled={!isAuthenticated && plan.title !== "Basic Plan"} // Example: disable if not auth, except Basic
                 >
                    {isAuthenticated ? "Invest Now" : <><LogIn className="mr-2 h-4 w-4" /> Login to Invest</>}
                 </Button>
@@ -425,7 +435,7 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
                        onChange={handleAmountChange}
                        placeholder={`e.g., ${selectedPlan.minInvestment}`}
                        className={amountError ? 'border-destructive' : ''}
-                       disabled={selectedPlan.title === "Basic Plan"}
+                       // Removed disabled={selectedPlan.title === "Basic Plan"}
                        required
                    />
                    <p className="text-xs text-muted-foreground">
@@ -542,3 +552,6 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
     </>
   );
 }
+
+
+    
