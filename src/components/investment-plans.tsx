@@ -30,24 +30,24 @@ const plansData: Omit<Plan, 'investmentAmount'>[] = [
    {
     title: "Basic Plan",
     icon: TrendingUp,
-    investmentRange: "PKR 500 – 5,000", // Updated
+    investmentRange: "PKR 500 – 5,000",
     duration: 15,
     dailyProfitMin: 1.0,
     dailyProfitMax: 1.5,
-    minInvestment: 500, // Updated
-    maxInvestment: 5000, // Updated
+    minInvestment: 500,
+    maxInvestment: 5000,
   },
   {
     title: "Advance Plan",
     icon: Zap,
-    investmentRange: "PKR 500 – 50,000",
+    investmentRange: "PKR 5,000 – 50,000", // Updated
     duration: 25,
     dailyProfitMin: 1.5,
     dailyProfitMax: 2.0,
     badge: "Popular",
     primary: true,
-    minInvestment: 500,
-    maxInvestment: 50000,
+    minInvestment: 5000, // Updated
+    maxInvestment: 50000, // Updated
   },
   {
     title: "Premium Plan",
@@ -229,7 +229,6 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
         return;
     }
     setSelectedPlan(plan);
-    // Pre-fill with minInvestment for Basic Plan, empty for others (or could also be minInvestment)
     setInvestmentAmount(plan.minInvestment.toString());
     setAmountError(null);
     setTransactionProof(null);
@@ -435,7 +434,6 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
                        onChange={handleAmountChange}
                        placeholder={`e.g., ${selectedPlan.minInvestment}`}
                        className={amountError ? 'border-destructive' : ''}
-                       // Removed disabled={selectedPlan.title === "Basic Plan"}
                        required
                    />
                    <p className="text-xs text-muted-foreground">
@@ -552,6 +550,5 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
     </>
   );
 }
-
 
     
