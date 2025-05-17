@@ -72,12 +72,12 @@ const plansData: Omit<Plan, 'investmentAmount'>[] = [
   {
     title: "Master Plan",
     icon: Milestone,
-    investmentRange: "PKR 1,000 – 100,000",
+    investmentRange: "PKR 50,000 – 500,000",
     duration: 90,
     dailyProfitMin: 3.0,
     dailyProfitMax: 4.5,
-    minInvestment: 1000,
-    maxInvestment: 100000,
+    minInvestment: 50000,
+    maxInvestment: 500000,
   },
 ];
 
