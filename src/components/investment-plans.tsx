@@ -40,23 +40,23 @@ const plansData: Omit<Plan, 'investmentAmount'>[] = [
   {
     title: "Advance Plan",
     icon: Zap,
-    investmentRange: "PKR 5,000 – 50,000", // Updated
+    investmentRange: "PKR 5,000 – 50,000",
     duration: 25,
     dailyProfitMin: 1.5,
     dailyProfitMax: 2.0,
     badge: "Popular",
     primary: true,
-    minInvestment: 5000, // Updated
-    maxInvestment: 50000, // Updated
+    minInvestment: 5000,
+    maxInvestment: 50000,
   },
   {
     title: "Premium Plan",
     icon: Gem,
-    investmentRange: "PKR 1,000 – 100,000",
+    investmentRange: "PKR 10,000 – 100,000",
     duration: 50,
     dailyProfitMin: 2.0,
     dailyProfitMax: 2.5,
-    minInvestment: 1000,
+    minInvestment: 10000,
     maxInvestment: 100000,
   },
   {
