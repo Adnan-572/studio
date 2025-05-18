@@ -27,16 +27,20 @@ const getStoredUsers = (): User[] => {
     const users = usersJson ? JSON.parse(usersJson) : [];
     
     // Ensure developer account exists
-    const devExists = users.some((u: User) => u.phoneNumber === DEV_PHONE);
+    const devExists = users.some((u: User) => u.phoneNumber === DEV_PHONE && u.userType === 'developer');
     if (!devExists) {
-      users.push({
+      // Remove any non-developer user with the DEV_PHONE
+      const filteredUsers = users.filter((u: User) => u.phoneNumber !== DEV_PHONE);
+      
+      filteredUsers.push({
         id: `dev_${Date.now()}`,
         phoneNumber: DEV_PHONE,
         passwordHash: DEV_PASSWORD, // Storing plain for simplicity, BAD for production
         userName: 'Developer Admin',
         userType: 'developer',
       });
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+      localStorage.setItem(USERS_KEY, JSON.stringify(filteredUsers));
+      return filteredUsers;
     }
     return users;
 
@@ -66,6 +70,12 @@ const setCurrentLoggedInUser = (user: User | null): void => {
 
 export const registerUser = async (phoneNumber: string, password: string, userName?: string): Promise<User | null> => {
   return new Promise((resolve) => {
+    if (phoneNumber === DEV_PHONE) {
+      console.warn("This phone number is reserved for the developer account and cannot be registered as a regular user.");
+      resolve(null);
+      return;
+    }
+
     const users = getStoredUsers();
     if (users.find(u => u.phoneNumber === phoneNumber)) {
       console.warn("User already exists with this phone number.");
@@ -93,7 +103,7 @@ export const registerUser = async (phoneNumber: string, password: string, userNa
 
 export const loginUser = async (phoneNumber: string, password: string): Promise<User | null> => {
   return new Promise((resolve) => {
-    const users = getStoredUsers();
+    const users = getStoredUsers(); // Ensures dev account is checked/created
     const user = users.find(u => u.phoneNumber === phoneNumber);
 
     if (user) {
