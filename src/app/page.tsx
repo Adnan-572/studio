@@ -23,6 +23,7 @@ export default function Home({ currentUser }: HomePageProps) {
   const [pendingInvestment, setPendingInvestment] = React.useState<InvestmentSubmission | null>(null);
   const [withdrawalRequest, setWithdrawalRequest] = React.useState<WithdrawalRequest | null>(null);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
+  const [showInvestmentPlans, setShowInvestmentPlans] = React.useState<boolean>(false);
 
   const checkStatus = React.useCallback(() => {
     if (!currentUser?.id) {
@@ -30,6 +31,7 @@ export default function Home({ currentUser }: HomePageProps) {
       setPendingInvestment(null);
       setWithdrawalRequest(null);
       setIsLoading(false);
+      setShowInvestmentPlans(false); // Reset if user logs out
       return;
     }
 
@@ -51,6 +53,12 @@ export default function Home({ currentUser }: HomePageProps) {
     setPendingInvestment(pending);
     setWithdrawalRequest(withdrawal);
     setIsLoading(false);
+
+    // If user becomes active or pending, hide the plan selection view
+    if (approved || pending) {
+        setShowInvestmentPlans(false);
+    }
+
   }, [currentUser]);
 
 
@@ -65,14 +73,11 @@ export default function Home({ currentUser }: HomePageProps) {
 
   const handleStartNewInvestment = () => {
     if (!activeInvestment && !pendingInvestment && (!withdrawalRequest || withdrawalRequest.status === 'completed' || withdrawalRequest.status === 'rejected')) {
-        // This function's purpose is to allow starting a new investment after a previous one is fully completed and withdrawn.
-        // It resets the state to show the investment plans again.
         setActiveInvestment(null);
         setPendingInvestment(null);
         setWithdrawalRequest(null);
-        setIsLoading(false); // To ensure UI updates if it was stuck in loading
-        // Explicitly call checkStatus to ensure the latest state from localStorage is reflected if needed,
-        // though setting states to null should be enough to re-render and show plans.
+        setShowInvestmentPlans(false); // Ensure plans are hidden initially when starting new
+        setIsLoading(false); 
         checkStatus();
     } else {
         console.log("Cannot start new investment while another is active/pending or withdrawal is not completed/rejected.");
@@ -81,6 +86,7 @@ export default function Home({ currentUser }: HomePageProps) {
 
   const handleInvestmentSubmissionSuccess = () => {
     console.log("Investment submitted, refreshing status...");
+    setShowInvestmentPlans(false); // Hide plans view after submission
     checkStatus(); // Immediately refresh status after submission
   };
 
@@ -127,7 +133,6 @@ export default function Home({ currentUser }: HomePageProps) {
             <h1 className="text-3xl font-bold tracking-tight text-primary">
               Your Investment Dashboard
             </h1>
-            {/* Show "Start New Investment" button only if plan is complete AND withdrawal is completed or rejected */}
             {activeInvestment && (!withdrawalRequest || withdrawalRequest.status === 'completed' || withdrawalRequest.status === 'rejected') && (
                  <Button onClick={handleStartNewInvestment} variant="outline" size="sm">
                     Start New Investment
@@ -146,26 +151,38 @@ export default function Home({ currentUser }: HomePageProps) {
             </AlertDescription>
           </Alert>
         </div>
-      ) : (
+      ) : ( // Logged in, no active/pending investment
         <>
-           <section id="welcome" className="text-center">
-                <h1 className="mb-4 text-4xl font-bold tracking-tight text-primary">
-                  Welcome, {currentUser.userName || currentUser.phoneNumber}!
-                </h1>
-                <p className="mb-8 text-lg text-muted-foreground">
-                  Choose an investment plan below to get started and grow your capital.
-                </p>
-           </section>
-            <Separator />
-          <section id="investment-plans">
-             <h2 className="text-2xl font-semibold tracking-tight text-center mb-6">Investment Plans</h2>
-            <InvestmentPlans
-                userId={currentUser.id}
-                userName={currentUser.userName || currentUser.phoneNumber}
-                isAuthenticated={true}
-                onSubmissionSuccess={handleInvestmentSubmissionSuccess}
-            />
+          <section id="welcome" className="text-center py-12">
+            <h1 className="mb-4 text-4xl font-bold tracking-tight text-primary">
+              Welcome, {currentUser.userName || currentUser.phoneNumber}!
+            </h1>
+            <p className="mb-8 text-lg text-muted-foreground max-w-xl mx-auto">
+              You are successfully logged in. You can manage your account or explore investment options to grow your capital.
+            </p>
+            {!showInvestmentPlans && (
+              <Button onClick={() => setShowInvestmentPlans(true)} size="lg" className="bg-primary hover:bg-primary/90">
+                Explore Investment Plans
+              </Button>
+            )}
           </section>
+
+          {showInvestmentPlans && (
+            <>
+              <Separator />
+              <section id="investment-plans" className="pt-8">
+                <h2 className="text-3xl font-semibold tracking-tight text-center mb-8">
+                  Our Investment Opportunities
+                </h2>
+                <InvestmentPlans
+                  userId={currentUser.id}
+                  userName={currentUser.userName || currentUser.phoneNumber}
+                  isAuthenticated={true}
+                  onSubmissionSuccess={handleInvestmentSubmissionSuccess}
+                />
+              </section>
+            </>
+          )}
         </>
       )}
 
@@ -180,3 +197,4 @@ export default function Home({ currentUser }: HomePageProps) {
     </div>
   );
 }
+
