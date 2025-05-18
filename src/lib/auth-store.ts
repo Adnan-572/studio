@@ -17,8 +17,8 @@ const USERS_KEY = 'rupay_users';
 const CURRENT_USER_KEY = 'rupay_current_user';
 
 // Developer account (hardcoded for now)
-const DEV_PHONE = '00000000000'; // Developer's phone number
-const DEV_PASSWORD = 'developerpassword'; // Developer's password
+const DEV_PHONE = '03121145736'; // Developer's phone number
+const DEV_PASSWORD = 'developer'; // Developer's password
 
 const getStoredUsers = (): User[] => {
   if (typeof window === 'undefined') return [];
