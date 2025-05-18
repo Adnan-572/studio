@@ -83,19 +83,21 @@ export default function Home({ currentUser }: HomePageProps) {
 
   if (!currentUser) {
     return (
-      <div className="container mx-auto px-4 py-8 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-        <Alert className="max-w-md text-center">
+      // Adjusted layout for when user is not logged in to ensure plans are visible
+      <div className="container mx-auto px-4 py-8"> 
+        <Alert className="max-w-lg text-center mx-auto"> {/* Centered alert, slightly wider */}
           <LogIn className="h-5 w-5" />
           <AlertTitle className="text-xl font-semibold">Please Login</AlertTitle>
           <AlertDescription>
-            You need to login or register to view your investments and access plans. Please use the button in the header.
+            You need to login or register to invest in our plans. 
+            You can explore the available plans below. Please use the button in the header to login/register.
           </AlertDescription>
         </Alert>
          <Separator className="my-12" />
           <section id="investment-plans-preview" className="w-full">
              <h2 className="text-2xl font-semibold tracking-tight text-center mb-6">Explore Our Investment Plans</h2>
              {/* Show plans but investing will be disabled or prompt login */}
-            <InvestmentPlans userId={null} userName={null} isAuthenticated={false} />
+            <InvestmentPlans userId={null} userName={null} isAuthenticated={false} /> 
           </section>
       </div>
     );
@@ -157,3 +159,4 @@ export default function Home({ currentUser }: HomePageProps) {
     </div>
   );
 }
+
