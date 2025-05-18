@@ -81,12 +81,8 @@ const plansData: Omit<Plan, 'investmentAmount'>[] = [
   },
 ];
 
-// The `investmentAmount` field in the Plan interface is used as a default or reference.
-// The actual investment amount logic is handled by minInvestment and maxInvestment for ranges.
 const plans: Plan[] = plansData.map(p => ({
   ...p,
-  // Setting a default investmentAmount to minInvestment for all plans here.
-  // This property is not directly used for the display of investmentRange on cards.
   investmentAmount: p.minInvestment,
 }));
 
@@ -204,9 +200,10 @@ interface InvestmentPlansProps {
   userId: string | null;
   userName: string | null;
   isAuthenticated: boolean;
+  onSubmissionSuccess?: () => void; // Callback for successful submission
 }
 
-export function InvestmentPlans({ userId, userName, isAuthenticated }: InvestmentPlansProps) {
+export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissionSuccess }: InvestmentPlansProps) {
   const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -223,8 +220,6 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
             title: "Login Required",
             description: "Please login or register to invest in a plan.",
             variant: "destructive",
-            // Action button to trigger login modal would require parent component interaction
-            // action: <Button onClick={() => { /* TODO: Trigger login modal from layout */ }}>Login</Button>
         });
         return;
     }
@@ -307,18 +302,15 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
      }
     setIsSubmitting(true);
     try {
-        // Ensure 'icon' is the React.ElementType, and 'iconName' is correctly derived for storage
         const submissionData = {
-            ...selectedPlan, // This includes minInvestment, maxInvestment, dailyProfitMin/Max etc.
+            ...selectedPlan, 
             investmentAmount: finalAmount,
             userId: userId,
             userName: userName,
             transactionProofDataUrl: transactionProofDataUrl,
             submissionDate: new Date().toISOString(),
             status: 'pending' as const,
-            // The 'icon' property from selectedPlan is a React.ElementType.
-            // addPendingInvestment expects it and will derive iconName internally.
-            icon: selectedPlan.icon, // Pass the icon component itself
+            icon: selectedPlan.icon, 
         };
         console.log("Submitting investment proof:", submissionData);
         // @ts-ignore - addPendingInvestment expects icon as ElementType which selectedPlan.icon is
@@ -329,6 +321,7 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
             variant: 'default',
         });
         setIsModalOpen(false);
+        onSubmissionSuccess?.(); // Call the callback
     } catch (error) {
          console.error("Submission error:", error);
         toast({ variant: "destructive", title: "Submission Failed", description: "There was an error submitting your proof. Please try again." });
@@ -360,7 +353,6 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
             ? `${totalReturnMinPercent.toFixed(1)}%`
             : `${totalReturnMinPercent.toFixed(1)}% – ${totalReturnMaxPercent.toFixed(1)}%`;
 
-           // Use plan.investmentRange for display on card, as it's already formatted string.
            const displayInvestment = plan.investmentRange;
 
 
@@ -550,5 +542,3 @@ export function InvestmentPlans({ userId, userName, isAuthenticated }: Investmen
     </>
   );
 }
-
-    

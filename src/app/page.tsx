@@ -24,54 +24,66 @@ export default function Home({ currentUser }: HomePageProps) {
   const [withdrawalRequest, setWithdrawalRequest] = React.useState<WithdrawalRequest | null>(null);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
 
-  React.useEffect(() => {
-    const checkStatus = () => {
-      if (!currentUser?.id) {
-        setActiveInvestment(null);
-        setPendingInvestment(null);
-        setWithdrawalRequest(null);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      console.log("Checking status for user:", currentUser.id);
-      const approved = getApprovedInvestmentForUser(currentUser.id);
-      const pending = getPendingInvestmentForUser(currentUser.id);
-      let withdrawal: WithdrawalRequest | null = null;
-
-      if (approved) {
-        withdrawal = getWithdrawalRequestForInvestment(approved.id!);
-        console.log("Found Withdrawal Request:", withdrawal);
-      }
-
-      console.log("Found Approved Investment:", approved);
-      console.log("Found Pending Investment:", pending);
-
-      setActiveInvestment(approved);
-      setPendingInvestment(pending);
-      setWithdrawalRequest(withdrawal);
+  const checkStatus = React.useCallback(() => {
+    if (!currentUser?.id) {
+      setActiveInvestment(null);
+      setPendingInvestment(null);
+      setWithdrawalRequest(null);
       setIsLoading(false);
-    };
+      return;
+    }
 
-    checkStatus();
+    setIsLoading(true);
+    console.log("Checking status for user:", currentUser.id);
+    const approved = getApprovedInvestmentForUser(currentUser.id);
+    const pending = getPendingInvestmentForUser(currentUser.id);
+    let withdrawal: WithdrawalRequest | null = null;
 
-    const interval = setInterval(checkStatus, 10000);
+    if (approved) {
+      withdrawal = getWithdrawalRequestForInvestment(approved.id!);
+      console.log("Found Withdrawal Request:", withdrawal);
+    }
+
+    console.log("Found Approved Investment:", approved);
+    console.log("Found Pending Investment:", pending);
+
+    setActiveInvestment(approved);
+    setPendingInvestment(pending);
+    setWithdrawalRequest(withdrawal);
+    setIsLoading(false);
+  }, [currentUser]);
+
+
+  React.useEffect(() => {
+    checkStatus(); // Initial check
+
+    const interval = setInterval(checkStatus, 10000); // Periodic check
     return () => clearInterval(interval);
 
-  }, [currentUser]); // Re-run when currentUser changes
+  }, [currentUser, checkStatus]);
 
 
   const handleStartNewInvestment = () => {
     if (!activeInvestment && !pendingInvestment && (!withdrawalRequest || withdrawalRequest.status === 'completed' || withdrawalRequest.status === 'rejected')) {
+        // This function's purpose is to allow starting a new investment after a previous one is fully completed and withdrawn.
+        // It resets the state to show the investment plans again.
         setActiveInvestment(null);
         setPendingInvestment(null);
         setWithdrawalRequest(null);
-        setIsLoading(false);
+        setIsLoading(false); // To ensure UI updates if it was stuck in loading
+        // Explicitly call checkStatus to ensure the latest state from localStorage is reflected if needed,
+        // though setting states to null should be enough to re-render and show plans.
+        checkStatus();
     } else {
-        console.log("Cannot start new investment while another is active or withdrawal is pending/processing.");
+        console.log("Cannot start new investment while another is active/pending or withdrawal is not completed/rejected.");
     }
   };
+
+  const handleInvestmentSubmissionSuccess = () => {
+    console.log("Investment submitted, refreshing status...");
+    checkStatus(); // Immediately refresh status after submission
+  };
+
 
   if (isLoading) {
     return (
@@ -83,21 +95,24 @@ export default function Home({ currentUser }: HomePageProps) {
 
   if (!currentUser) {
     return (
-      // Adjusted layout for when user is not logged in to ensure plans are visible
-      <div className="container mx-auto px-4 py-8"> 
-        <Alert className="max-w-lg text-center mx-auto"> {/* Centered alert, slightly wider */}
+      <div className="container mx-auto px-4 py-8">
+        <Alert className="max-w-lg text-center mx-auto">
           <LogIn className="h-5 w-5" />
           <AlertTitle className="text-xl font-semibold">Please Login</AlertTitle>
           <AlertDescription>
-            You need to login or register to invest in our plans. 
+            You need to login or register to invest in our plans.
             You can explore the available plans below. Please use the button in the header to login/register.
           </AlertDescription>
         </Alert>
          <Separator className="my-12" />
           <section id="investment-plans-preview" className="w-full">
              <h2 className="text-2xl font-semibold tracking-tight text-center mb-6">Explore Our Investment Plans</h2>
-             {/* Show plans but investing will be disabled or prompt login */}
-            <InvestmentPlans userId={null} userName={null} isAuthenticated={false} /> 
+            <InvestmentPlans
+              userId={null}
+              userName={null}
+              isAuthenticated={false}
+              onSubmissionSuccess={() => { /* No action needed for unauthenticated users */ }}
+            />
           </section>
       </div>
     );
@@ -112,7 +127,8 @@ export default function Home({ currentUser }: HomePageProps) {
             <h1 className="text-3xl font-bold tracking-tight text-primary">
               Your Investment Dashboard
             </h1>
-            {(!withdrawalRequest || withdrawalRequest.status === 'completed' || withdrawalRequest.status === 'rejected') && (
+            {/* Show "Start New Investment" button only if plan is complete AND withdrawal is completed or rejected */}
+            {activeInvestment && (!withdrawalRequest || withdrawalRequest.status === 'completed' || withdrawalRequest.status === 'rejected') && (
                  <Button onClick={handleStartNewInvestment} variant="outline" size="sm">
                     Start New Investment
                  </Button>
@@ -143,7 +159,12 @@ export default function Home({ currentUser }: HomePageProps) {
             <Separator />
           <section id="investment-plans">
              <h2 className="text-2xl font-semibold tracking-tight text-center mb-6">Investment Plans</h2>
-            <InvestmentPlans userId={currentUser.id} userName={currentUser.userName || currentUser.phoneNumber} isAuthenticated={true} />
+            <InvestmentPlans
+                userId={currentUser.id}
+                userName={currentUser.userName || currentUser.phoneNumber}
+                isAuthenticated={true}
+                onSubmissionSuccess={handleInvestmentSubmissionSuccess}
+            />
           </section>
         </>
       )}
@@ -159,4 +180,3 @@ export default function Home({ currentUser }: HomePageProps) {
     </div>
   );
 }
-
