@@ -1,78 +1,159 @@
 
-// This file previously handled localStorage for investments.
-// With Firebase, this logic will be moved to Firestore interactions.
-
 import type { Plan as PlanUIDetails } from '@/components/investment-plans';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, doc, updateDoc, Timestamp, orderBy } from 'firebase/firestore';
 
-// This will be the structure for data in Firestore.
-// It will include the Firebase user's UID.
-export interface InvestmentSubmissionFirestore extends Omit<PlanUIDetails, 'icon' | 'badge' | 'primary' | 'investmentRange' | 'id'> {
-    id?: string; // Firestore document ID will be set automatically
-    userId: string; // Firebase Auth User UID
-    userName: string; // User's name (collected at submission)
-    userPhoneNumber: string; // User's actual phone number (used as an identifier if not logged in, or from profile)
+export interface InvestmentSubmissionFirestore {
+    id?: string; // Firestore document ID
+    userId: string; 
+    userName: string; 
+    userPhoneNumber: string; 
+    planId: string;
+    planTitle: string;
     investmentAmount: number; 
-    transactionProofUrl: string; // URL from Firebase Storage
-    submissionDate: string; // ISO string
-    status: 'pending' | 'approved' | 'rejected' | 'completed';
-    approvalDate?: string | null; 
-    rejectionReason?: string | null;
-    completionDate?: string | null; // When the plan duration ends
-    iconName: string; 
-    referralBonusPercent?: number; // If applicable
-    // Fields from PlanUIDetails that are useful to store directly
-    title: string;
-    duration: number;
-    dailyProfitMin: number;
-    dailyProfitMax: number;
     minInvestment: number;
     maxInvestment: number;
+    dailyProfitMin: number;
+    dailyProfitMax: number;
+    duration: number;
+    iconName: string;
+    transactionProofUrl: string; 
+    submissionDate: Timestamp; // Firestore Timestamp for submission
+    status: 'pending' | 'approved' | 'rejected' | 'completed';
+    approvalDate?: Timestamp | null; // Firestore Timestamp for approval
+    rejectionReason?: string | null;
+    completionDate?: Timestamp | null; 
+    referralBonusPercent?: number;
 }
 
+// Fetches pending investments for the developer dashboard
+export const getPendingInvestmentsFromFirestore = async (): Promise<InvestmentSubmissionFirestore[]> => {
+  if (!db) {
+    console.error("Firestore not initialized");
+    return [];
+  }
+  try {
+    const q = query(collection(db, "investments"), where("status", "==", "pending"), orderBy("submissionDate", "desc"));
+    const querySnapshot = await getDocs(q);
+    const investments: InvestmentSubmissionFirestore[] = [];
+    querySnapshot.forEach((doc) => {
+      investments.push({ id: doc.id, ...doc.data() } as InvestmentSubmissionFirestore);
+    });
+    return investments;
+  } catch (error) {
+    console.error("Error fetching pending investments: ", error);
+    return [];
+  }
+};
 
-// Placeholder functions to avoid breaking Developer Dashboard
-// These will be replaced with Firestore logic
+// Fetches approved (active or completed) investments for the developer dashboard
+export const getApprovedInvestmentsFromFirestore = async (): Promise<InvestmentSubmissionFirestore[]> => {
+  if (!db) {
+    console.error("Firestore not initialized");
+    return [];
+  }
+  try {
+    // Fetching 'approved' and 'completed' as they were once approved.
+    const q = query(
+      collection(db, "investments"), 
+      where("status", "in", ["approved", "completed"]),
+      orderBy("approvalDate", "desc")
+    );
+    const querySnapshot = await getDocs(q);
+    const investments: InvestmentSubmissionFirestore[] = [];
+    querySnapshot.forEach((doc) => {
+      investments.push({ id: doc.id, ...doc.data() } as InvestmentSubmissionFirestore);
+    });
+    return investments;
+  } catch (error) {
+    console.error("Error fetching approved investments: ", error);
+    return [];
+  }
+};
+
+
+export const approveInvestmentInFirestore = async (submissionId: string): Promise<void> => {
+  if (!db) {
+    console.error("Firestore not initialized");
+    throw new Error("Firestore not initialized");
+  }
+  try {
+    const investmentRef = doc(db, "investments", submissionId);
+    await updateDoc(investmentRef, {
+      status: 'approved',
+      approvalDate: Timestamp.now() 
+    });
+  } catch (error) {
+    console.error("Error approving investment: ", error);
+    throw error;
+  }
+};
+
+export const rejectInvestmentInFirestore = async (submissionId: string, reason: string = "Rejected by admin"): Promise<void> => {
+  if (!db) {
+    console.error("Firestore not initialized");
+    throw new Error("Firestore not initialized");
+  }
+  try {
+    const investmentRef = doc(db, "investments", submissionId);
+    await updateDoc(investmentRef, {
+      status: 'rejected',
+      rejectionReason: reason,
+      approvalDate: null, // Clear approval date if any
+    });
+  } catch (error) {
+    console.error("Error rejecting investment: ", error);
+    throw error;
+  }
+};
+
+// Fetches active investments for a specific user for their dashboard
+export const getActiveInvestmentsForUserFromFirestore = async (userId: string): Promise<InvestmentSubmissionFirestore[]> => {
+  if (!db) {
+    console.error("Firestore not initialized");
+    return [];
+  }
+  try {
+    // An investment is "active" if its status is 'approved' AND its calculated completionDate is in the future.
+    // Or status is 'completed'.
+    const q = query(
+        collection(db, "investments"), 
+        where("userId", "==", userId),
+        where("status", "in", ["approved", "completed"]), // User dashboard shows both
+        orderBy("submissionDate", "desc")
+    );
+    const querySnapshot = await getDocs(q);
+    const investments: InvestmentSubmissionFirestore[] = [];
+    querySnapshot.forEach((doc) => {
+      investments.push({ id: doc.id, ...doc.data() } as InvestmentSubmissionFirestore);
+    });
+    return investments;
+  } catch (error) {
+    console.error("Error fetching user's active investments: ", error);
+    return [];
+  }
+};
+
+// Placeholder functions to avoid breaking other parts of the app during refactor
+// These were the names used in the old localStorage-based system.
+// They should be replaced by Firestore-specific functions or removed if not needed.
 
 export const getAllPendingInvestments = (): InvestmentSubmissionFirestore[] => {
-  console.warn("getAllPendingInvestments is a placeholder and not fetching from Firestore.");
-  // For DeveloperDashboard to not break, it expects:
-  // submission.id, submission.userName, submission.userId (phone), submission.title, submission.investmentAmount, submission.submissionDate, submission.transactionProofDataUrl
-  // The type used in dashboard is InvestmentSubmission which has transactionProofDataUrl
-  // We should map transactionProofUrl to transactionProofDataUrl if needed, or update dashboard
+  console.warn("getAllPendingInvestments is a placeholder. Use getPendingInvestmentsFromFirestore.");
   return [];
 };
 
 export const approveInvestment = async (submissionId: string): Promise<void> => {
-  console.warn(`approveInvestment(${submissionId}) is a placeholder and not updating Firestore.`);
+  console.warn(`approveInvestment(${submissionId}) is a placeholder. Use approveInvestmentInFirestore.`);
   return Promise.resolve();
 };
 
 export const rejectInvestment = async (submissionId: string): Promise<void> => {
-  console.warn(`rejectInvestment(${submissionId}) is a placeholder and not updating Firestore.`);
+  console.warn(`rejectInvestment(${submissionId}) is a placeholder. Use rejectInvestmentInFirestore.`);
   return Promise.resolve();
 };
 
 export const getAllApprovedInvestments = (): InvestmentSubmissionFirestore[] => {
-  console.warn("getAllApprovedInvestments is a placeholder and not fetching from Firestore.");
-  // For DeveloperDashboard, it expects:
-  // investment.id, investment.userName, investment.userId (phone), investment.title, investment.investmentAmount, investment.approvalDate, investment.duration
+  console.warn("getAllApprovedInvestments is a placeholder. Use getApprovedInvestmentsFromFirestore.");
   return [];
-};
-
-// This function might be needed by other parts if they were using it for user-facing dashboard
-export const getInvestmentsForUser = (userPhone: string): InvestmentSubmissionFirestore[] => {
-  console.warn(`getInvestmentsForUser(${userPhone}) is a placeholder.`);
-  return [];
-};
-
-// This function might be needed by investment-plans component for submission
-export const addPendingInvestment = async (submission: Omit<InvestmentSubmissionFirestore, 'id' | 'status' | 'submissionDate'>): Promise<InvestmentSubmissionFirestore> => {
-  console.warn("addPendingInvestment is a placeholder and not saving to Firestore.");
-  const newSubmission: InvestmentSubmissionFirestore = {
-    ...submission,
-    id: `temp_${Date.now()}`,
-    status: 'pending',
-    submissionDate: new Date().toISOString(),
-  };
-  return Promise.resolve(newSubmission);
 };

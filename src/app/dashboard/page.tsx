@@ -7,58 +7,106 @@ import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
-import { InvestmentPlans } from '@/components/investment-plans'; // For exploring new plans
-
-// This will be the main user dashboard after login.
-// For now, it's a simple placeholder.
-// Later, it will fetch and display user's active investments from Firestore.
+import { InvestmentPlans } from '@/components/investment-plans';
+import { Dashboard as UserInvestmentDashboard } from '@/components/dashboard'; // Renamed import
+import { getActiveInvestmentsForUserFromFirestore, type InvestmentSubmissionFirestore } from '@/lib/investment-store';
+import { Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PlusCircle } from 'lucide-react';
 
 export default function DashboardPage() {
   const { currentUser, logoutUser } = useAuth();
   const router = useRouter();
+  const [userInvestments, setUserInvestments] = React.useState<InvestmentSubmissionFirestore[]>([]);
+  const [isLoadingInvestments, setIsLoadingInvestments] = React.useState(true);
 
-  // Placeholder: Fetch active investment data here
-  // For now, we'll just show a welcome and an option to explore plans.
+  React.useEffect(() => {
+    if (currentUser?.uid) {
+      setIsLoadingInvestments(true);
+      getActiveInvestmentsForUserFromFirestore(currentUser.uid)
+        .then(investments => {
+          setUserInvestments(investments);
+        })
+        .catch(error => {
+          console.error("Error fetching user investments:", error);
+          // Optionally show a toast message
+        })
+        .finally(() => {
+          setIsLoadingInvestments(false);
+        });
+    } else {
+      setIsLoadingInvestments(false); // No user, so not loading
+    }
+  }, [currentUser?.uid]);
+
+  const hasActiveOrPendingInvestment = userInvestments.some(
+    inv => inv.status === 'approved' || inv.status === 'pending'
+  );
 
   return (
     <ProtectedRoute>
       <div className="container mx-auto px-4 py-8 space-y-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-primary">
-              Welcome to Your Dashboard, {currentUser?.email?.split('@')[0] || 'User'}!
-            </CardTitle>
-            <CardDescription>
-              Manage your investments and track your growth.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-6 text-muted-foreground">
-              Your active investment details will appear here soon.
-              Currently, this section is under development.
-            </p>
-            {/* Placeholder for active investment display */}
-            <div className="p-6 border rounded-lg bg-muted/30 text-center">
-              <p className="text-lg font-semibold">No Active Investment Found</p>
-              <p className="text-sm text-muted-foreground mb-4">Explore our plans to start growing your capital.</p>
+        <Card className="shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl font-bold text-primary">
+                Welcome, {currentUser?.email?.split('@')[0] || 'Investor'}!
+              </CardTitle>
+              <CardDescription>
+                Manage your investments and track your financial growth with Rupay Growth.
+              </CardDescription>
             </div>
-          </CardContent>
+            <Button variant="outline" onClick={() => {
+              logoutUser().then(() => router.push('/login'));
+            }}>
+              Logout
+            </Button>
+          </CardHeader>
         </Card>
-        
-        <section id="explore-plans">
-          <h2 className="text-3xl font-semibold tracking-tight text-center mb-8">
-            Explore Investment Opportunities
-          </h2>
-          <InvestmentPlans isAuthenticated={!!currentUser} />
-        </section>
 
-        <div className="text-center mt-8">
-          <Button variant="outline" onClick={() => {
-            logoutUser().then(() => router.push('/login'));
-          }}>
-            Logout
-          </Button>
-        </div>
+        {isLoadingInvestments ? (
+          <div className="flex justify-center items-center min-h-[200px]">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="ml-3 text-muted-foreground">Loading your investments...</p>
+          </div>
+        ) : userInvestments.length > 0 ? (
+          <div className="space-y-6">
+            {userInvestments.map(investment => (
+               <UserInvestmentDashboard key={investment.id} plan={investment} />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>No Active Investments Found</AlertTitle>
+                <AlertDescription>
+                  You currently don&apos;t have any active or pending investments. Explore our plans to start growing your capital.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        )}
+
+        {!hasActiveOrPendingInvestment && !isLoadingInvestments && (
+          <section id="explore-plans" className="pt-8">
+             <Card>
+                <CardHeader>
+                    <CardTitle className="text-xl flex items-center">
+                        <PlusCircle className="mr-2 h-5 w-5 text-primary" />
+                        Explore New Investment Opportunities
+                    </CardTitle>
+                    <CardDescription>
+                        Ready to grow your capital? Choose from our tailored investment plans.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <InvestmentPlans isAuthenticated={!!currentUser} />
+                </CardContent>
+            </Card>
+          </section>
+        )}
       </div>
     </ProtectedRoute>
   );

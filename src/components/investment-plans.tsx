@@ -5,36 +5,36 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle, X, User, Phone } from "lucide-react";
+import { TrendingUp, Zap, Gem, Crown, Milestone, Calculator, Copy } from "lucide-react";
 import { Separator } from '@/components/ui/separator';
-// Removed: import { addPendingInvestment, type InvestmentSubmission } from '@/lib/investment-store';
-// Investment submission will now go through Firebase/Firestore
 import { useRouter } from 'next/navigation';
-
+import { useAuth } from '@/contexts/auth-context'; // For checking authentication status
 
 export interface Plan {
   id: string; 
   title: string;
   icon: React.ElementType;
-  iconName: string; 
+  iconName: string; // For storing in Firestore if needed, e.g., "TrendingUp"
   investmentRange: string;
-  duration: number;
-  dailyProfitMin: number;
-  dailyProfitMax: number;
+  duration: number; // in days
+  dailyProfitMin: number; // percentage
+  dailyProfitMax: number; // percentage
   badge?: string;
   primary?: boolean;
   minInvestment: number;
   maxInvestment: number;
 }
 
-const plansData: Omit<Plan, 'id' | 'iconName'>[] = [
+// Export plansData so it can be used by submit-proof page
+export const plansData: Plan[] = [
    {
+    id: "plan_basic_15d",
     title: "Basic Plan",
     icon: TrendingUp,
+    iconName: "TrendingUp",
     investmentRange: "PKR 500 – 5,000",
     duration: 15,
     dailyProfitMin: 1.0,
@@ -43,8 +43,10 @@ const plansData: Omit<Plan, 'id' | 'iconName'>[] = [
     maxInvestment: 5000,
   },
   {
+    id: "plan_advance_25d",
     title: "Advance Plan",
     icon: Zap,
+    iconName: "Zap",
     investmentRange: "PKR 5,000 – 50,000",
     duration: 25,
     dailyProfitMin: 1.5,
@@ -55,8 +57,10 @@ const plansData: Omit<Plan, 'id' | 'iconName'>[] = [
     maxInvestment: 50000,
   },
   {
+    id: "plan_premium_50d",
     title: "Premium Plan",
     icon: Gem,
+    iconName: "Gem",
     investmentRange: "PKR 10,000 – 100,000",
     duration: 50,
     dailyProfitMin: 2.0,
@@ -65,8 +69,10 @@ const plansData: Omit<Plan, 'id' | 'iconName'>[] = [
     maxInvestment: 100000,
   },
   {
+    id: "plan_expert_75d",
     title: "Expert Plan",
     icon: Crown,
+    iconName: "Crown",
     investmentRange: "PKR 20,000 – 200,000",
     duration: 75,
     dailyProfitMin: 2.5,
@@ -75,8 +81,10 @@ const plansData: Omit<Plan, 'id' | 'iconName'>[] = [
     maxInvestment: 200000,
   },
   {
+    id: "plan_master_90d",
     title: "Master Plan",
     icon: Milestone,
+    iconName: "Milestone",
     investmentRange: "PKR 50,000 – 500,000",
     duration: 90,
     dailyProfitMin: 3.0,
@@ -86,22 +94,20 @@ const plansData: Omit<Plan, 'id' | 'iconName'>[] = [
   },
 ];
 
-const plans: Plan[] = plansData.map((p, index) => ({
-  ...p,
-  id: `plan_${index}_${p.title.toLowerCase().replace(/\s+/g, '_')}`,
-  iconName: p.icon.displayName || p.icon.name || 'TrendingUp',
-}));
 
-// Payment details remain for display
-const paymentDetails = {
+const paymentAccountDetails = {
   easypaisa: {
-    accountName: "adnan tariq",
+    accountName: "Adnan Tariq",
     accountNumber: "03411167577",
   },
   jazzcash: {
-    accountName: "Rupay Growth Investment", // Placeholder for JazzCash name
-    accountNumber: "03012345678", // Placeholder for JazzCash number
+    accountName: "Rupay Growth Investment", 
+    accountNumber: "03012345678", 
   },
+  sadapay: {
+    accountName: "Rupay Growth",
+    accountNumber: "03121145736", // Example
+  }
 };
 
 const formatCurrency = (amount: number) => {
@@ -151,8 +157,9 @@ const ProfitCalculator: React.FC<{ plan: Plan, inputAmount?: string }> = ({ plan
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
+        // Allow only numbers and ensure it doesn't start with multiple zeros if not just "0"
         if (value === '' || /^[0-9]*$/.test(value)) {
-           if (value.length > 1 && value.startsWith('0')) {
+           if (value.length > 1 && value.startsWith('0') && value !== '0') {
              setAmount(value.substring(1));
            } else {
              setAmount(value);
@@ -209,23 +216,18 @@ const ProfitCalculator: React.FC<{ plan: Plan, inputAmount?: string }> = ({ plan
 };
 
 interface InvestmentPlansProps {
-  isAuthenticated: boolean; // To control button behavior
+  isAuthenticated: boolean; 
 }
 
 export function InvestmentPlans({ isAuthenticated }: InvestmentPlansProps) {
   const { toast } = useToast();
   const router = useRouter();
-  // Modal state removed as submission will happen on a new page after login
-  // const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null);
-  // const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const { currentUser } = useAuth(); // Get current user
 
   const handleInvestClick = (planId: string) => {
-    if (isAuthenticated) {
-      // User is logged in, navigate to submit proof page (to be created)
-      // Pass planId and potentially other plan details if needed.
+    if (currentUser && isAuthenticated) { // Check both currentUser and isAuthenticated
       router.push(`/submit-proof?planId=${encodeURIComponent(planId)}`);
     } else {
-      // User not logged in, redirect to login page
       toast({
         title: "Login Required",
         description: "Please login or register to invest.",
@@ -248,7 +250,7 @@ export function InvestmentPlans({ isAuthenticated }: InvestmentPlansProps) {
   return (
     <>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {plans.map((plan) => {
+        {plansData.map((plan) => {
           const PlanIconComponent = plan.icon;
           const dailyProfitText = plan.dailyProfitMin === plan.dailyProfitMax
             ? `${plan.dailyProfitMin.toFixed(1)}%`
@@ -305,28 +307,20 @@ export function InvestmentPlans({ isAuthenticated }: InvestmentPlansProps) {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-3">
                 <div>
-                   <h4 className="font-semibold mb-1">Payment Accounts:</h4>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <Card className="bg-muted/50 p-3">
-                            <CardTitle className="text-base font-medium mb-1">Easypaisa</CardTitle>
-                            <p>Name: <span className="font-medium">{paymentDetails.easypaisa.accountName}</span></p>
-                            <div className="flex items-center gap-1">
-                                <p>Number: <span className="font-mono">{paymentDetails.easypaisa.accountNumber}</span></p>
-                                <Button type="button" variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyToClipboard(paymentDetails.easypaisa.accountNumber, 'Easypaisa Number')}>
-                                    <Copy className="h-3 w-3" />
-                                </Button>
-                            </div>
-                        </Card>
-                        <Card className="bg-muted/50 p-3">
-                            <CardTitle className="text-base font-medium mb-1">JazzCash</CardTitle>
-                            <p>Name: <span className="font-medium">{paymentDetails.jazzcash.accountName}</span></p>
-                             <div className="flex items-center gap-1">
-                                <p>Number: <span className="font-mono">{paymentDetails.jazzcash.accountNumber}</span></p>
-                                <Button type="button" variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyToClipboard(paymentDetails.jazzcash.accountNumber, 'JazzCash Number')}>
-                                    <Copy className="h-3 w-3" />
-                                </Button>
-                            </div>
-                        </Card>
+                   <h4 className="font-semibold mb-1">Payment Accounts (For Investment):</h4>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {Object.entries(paymentAccountDetails).map(([key, detail]) => (
+                            <Card key={key} className="bg-muted/50 p-3">
+                                <CardTitle className="text-base font-medium mb-1 capitalize">{key}</CardTitle>
+                                <p>Name: <span className="font-medium">{detail.accountName}</span></p>
+                                <div className="flex items-center gap-1">
+                                    <p>Number: <span className="font-mono">{detail.accountNumber}</span></p>
+                                    <Button type="button" variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyToClipboard(detail.accountNumber, `${key} Number`)}>
+                                        <Copy className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </Card>
+                        ))}
                    </div>
                 </div>
                  <Separator className="my-3"/>
@@ -336,7 +330,6 @@ export function InvestmentPlans({ isAuthenticated }: InvestmentPlansProps) {
             </CardContent>
          </Card>
       </div>
-      {/* Modal for investment submission is removed from here, will be on a separate /submit-proof page */}
     </>
   );
 }
