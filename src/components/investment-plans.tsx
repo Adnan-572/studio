@@ -5,11 +5,11 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle, X, LogIn } from "lucide-react";
+import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle, X, User, Phone } from "lucide-react";
 import { Separator } from '@/components/ui/separator';
 import { addPendingInvestment } from '@/lib/investment-store';
 
@@ -94,7 +94,7 @@ const paymentDetails = {
   },
   jazzcash: {
     accountName: "Rupay Growth Investment",
-    accountNumber: "03012345678",
+    accountNumber: "03012345678", // Placeholder
   },
 };
 
@@ -197,16 +197,16 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
 };
 
 interface InvestmentPlansProps {
-  userId: string | null;
-  userName: string | null;
-  isAuthenticated: boolean;
-  onSubmissionSuccess?: () => void; // Callback for successful submission
+  onSubmissionSuccess: (phoneNumber: string) => void;
 }
 
-export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissionSuccess }: InvestmentPlansProps) {
+export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
   const { toast } = useToast();
   const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  
+  const [userName, setUserName] = React.useState<string>('');
+  const [userPhoneNumber, setUserPhoneNumber] = React.useState<string>('');
   const [investmentAmount, setInvestmentAmount] = React.useState<string>('');
   const [transactionProof, setTransactionProof] = React.useState<File | null>(null);
   const [transactionProofDataUrl, setTransactionProofDataUrl] = React.useState<string | null>(null);
@@ -215,16 +215,10 @@ export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissio
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleInvestClick = (plan: Plan) => {
-    if (!isAuthenticated) {
-        toast({
-            title: "Login Required",
-            description: "Please login or register to invest in a plan.",
-            variant: "destructive",
-        });
-        return;
-    }
     setSelectedPlan(plan);
     setInvestmentAmount(plan.minInvestment.toString());
+    setUserName(''); // Reset fields for new submission
+    setUserPhoneNumber('');
     setAmountError(null);
     setTransactionProof(null);
     setTransactionProofDataUrl(null);
@@ -280,10 +274,16 @@ export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissio
    };
 
   const handleSubmitProof = async () => {
-    if (!selectedPlan || !userId || !userName) {
-        toast({ variant: "destructive", title: "Error", description: "User not identified. Please login again." });
+    if (!selectedPlan) return;
+    if (!userName.trim()) {
+        toast({ variant: "destructive", title: "Name Required", description: "Please enter your name." });
         return;
     }
+    if (!userPhoneNumber.trim() || !/^\d{10,15}$/.test(userPhoneNumber.trim())) {
+        toast({ variant: "destructive", title: "Invalid Phone Number", description: "Please enter a valid phone number (10-15 digits)." });
+        return;
+    }
+
      const finalAmount = parseInt(investmentAmount, 10);
       if (isNaN(finalAmount) || finalAmount < selectedPlan.minInvestment || finalAmount > selectedPlan.maxInvestment) {
          setAmountError(`Amount must be between ${formatCurrency(selectedPlan.minInvestment)} and ${formatCurrency(selectedPlan.maxInvestment)}.`);
@@ -300,28 +300,28 @@ export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissio
        toast({ variant: "destructive", title: "Invalid Amount", description: amountError });
        return;
      }
+
     setIsSubmitting(true);
     try {
         const submissionData = {
             ...selectedPlan, 
             investmentAmount: finalAmount,
-            userId: userId,
+            userId: userPhoneNumber, // Use phone number as userId
             userName: userName,
             transactionProofDataUrl: transactionProofDataUrl,
             submissionDate: new Date().toISOString(),
             status: 'pending' as const,
             icon: selectedPlan.icon, 
         };
-        console.log("Submitting investment proof:", submissionData);
         // @ts-ignore - addPendingInvestment expects icon as ElementType which selectedPlan.icon is
         await addPendingInvestment(submissionData);
         toast({
             title: "Proof Submitted Successfully",
-            description: `Your investment proof for the ${selectedPlan.title} (${formatCurrency(finalAmount)}) is pending approval.`,
+            description: `Your investment proof for ${selectedPlan.title} (${formatCurrency(finalAmount)}) under phone ${userPhoneNumber} is pending approval.`,
             variant: 'default',
         });
         setIsModalOpen(false);
-        onSubmissionSuccess?.(); // Call the callback
+        onSubmissionSuccess?.(userPhoneNumber); // Call the callback with the phone number
     } catch (error) {
          console.error("Submission error:", error);
         toast({ variant: "destructive", title: "Submission Failed", description: "There was an error submitting your proof. Please try again." });
@@ -355,7 +355,6 @@ export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissio
 
            const displayInvestment = plan.investmentRange;
 
-
           return (
             <Card key={plan.title} className={`flex flex-col ${plan.primary ? 'border-primary ring-2 ring-primary shadow-lg' : ''}`}>
               <CardHeader className="items-center pb-4 relative">
@@ -387,7 +386,7 @@ export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissio
                   variant={plan.primary ? "default" : "outline"}
                   onClick={() => handleInvestClick(plan)}
                 >
-                   {isAuthenticated ? "Invest Now" : <><LogIn className="mr-2 h-4 w-4" /> Login to Invest</>}
+                   Invest Now
                 </Button>
               </CardFooter>
             </Card>
@@ -412,10 +411,32 @@ export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissio
               <DialogHeader>
                 <DialogTitle className="text-2xl text-primary">Invest in {selectedPlan.title}</DialogTitle>
                  <DialogDescription>
-                    Enter the amount you wish to invest (within the plan's range), send the payment to one of the accounts below, and upload the transaction proof.
+                    Enter your details, the amount you wish to invest, send the payment to one of the accounts below, and upload the transaction proof.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-6 py-4">
+                <div className="space-y-2">
+                   <Label htmlFor="user-name"><User className="inline h-4 w-4 mr-1" /> Your Name</Label>
+                   <Input
+                       id="user-name"
+                       type="text"
+                       value={userName}
+                       onChange={(e) => setUserName(e.target.value)}
+                       placeholder="Enter your full name"
+                       required
+                   />
+                </div>
+                <div className="space-y-2">
+                   <Label htmlFor="user-phone-number"><Phone className="inline h-4 w-4 mr-1" /> Your Phone Number (for tracking)</Label>
+                   <Input
+                       id="user-phone-number"
+                       type="tel"
+                       value={userPhoneNumber}
+                       onChange={(e) => setUserPhoneNumber(e.target.value)}
+                       placeholder="e.g., 03001234567"
+                       required
+                   />
+                </div>
                 <div className="space-y-2">
                    <Label htmlFor="investment-amount" className="text-base font-semibold">Investment Amount (PKR)</Label>
                    <Input
@@ -525,7 +546,7 @@ export function InvestmentPlans({ userId, userName, isAuthenticated, onSubmissio
                 <Button
                   type="button"
                   onClick={handleSubmitProof}
-                  disabled={isSubmitting || !transactionProofDataUrl || !!amountError || investmentAmount === ''}
+                  disabled={isSubmitting || !transactionProofDataUrl || !!amountError || investmentAmount === '' || !userName.trim() || !userPhoneNumber.trim()}
                   aria-live="polite"
                 >
                   {isSubmitting ? (

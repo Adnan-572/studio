@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  allowedDevOrigins: [
+    'http://localhost:5000',
+    'http://9005-idx-studio-1746374189150.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev',
+  ],
 };
 
 export default nextConfig;

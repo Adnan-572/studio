@@ -1,31 +1,26 @@
 
-'use client'; // Indicate this runs client-side for localStorage access
+'use client'; 
 
-// Define the structure for a withdrawal request
 export interface WithdrawalRequest {
-    id: string; // Unique ID for the withdrawal request
-    userId: string;
-    userName: string;
-    investmentId: string; // Link back to the completed investment
-    investmentTitle: string; // Plan title for easy reference
-    withdrawalAmount: number; // The amount requested (usually total return)
+    id: string; 
+    userId: string; // User's phone number
+    userName: string; // User's name
+    investmentId: string; 
+    investmentTitle: string; 
+    withdrawalAmount: number; 
     paymentMethod: 'easypaisa' | 'jazzcash';
-    accountNumber: string; // User's Easypaisa/JazzCash account number
-    requestDate: string; // ISO string date when requested
+    accountNumber: string; 
+    requestDate: string; 
     status: 'pending' | 'processing' | 'completed' | 'rejected';
-    processedDate?: string | null; // ISO string date when completed/rejected
-    rejectionReason?: string | null; // Reason if rejected
-    transactionId?: string | null; // Optional transaction ID from payment gateway after processing
+    processedDate?: string | null; 
+    rejectionReason?: string | null; 
+    transactionId?: string | null; 
 }
 
-// --- Helper Functions (similar to investment-store) ---
 const WITHDRAWALS_KEY = 'rupay_withdrawal_requests';
 
-// Helper to safely get data from localStorage
 const getFromLocalStorage = <T>(key: string): T[] => {
-    if (typeof window === 'undefined') {
-        return []; // Return empty array if on server-side
-    }
+    if (typeof window === 'undefined') return [];
     try {
         const item = localStorage.getItem(key);
         return item ? JSON.parse(item) : [];
@@ -35,11 +30,8 @@ const getFromLocalStorage = <T>(key: string): T[] => {
     }
 };
 
-// Helper to safely set data to localStorage
 const setToLocalStorage = <T>(key: string, data: T[]): void => {
-    if (typeof window === 'undefined') {
-        return; // Do nothing if on server-side
-    }
+    if (typeof window === 'undefined') return;
     try {
         localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
@@ -47,12 +39,6 @@ const setToLocalStorage = <T>(key: string, data: T[]): void => {
     }
 };
 
-// --- Store Functions ---
-
-/**
- * Adds a new withdrawal request to the list.
- * Assigns a unique ID.
- */
 export const addWithdrawalRequest = async (requestData: Omit<WithdrawalRequest, 'id'>): Promise<WithdrawalRequest> => {
     return new Promise((resolve) => {
         const requests = getFromLocalStorage<WithdrawalRequest>(WITHDRAWALS_KEY);
@@ -62,57 +48,32 @@ export const addWithdrawalRequest = async (requestData: Omit<WithdrawalRequest, 
         };
         requests.push(newRequest);
         setToLocalStorage(WITHDRAWALS_KEY, requests);
-        console.log("Added withdrawal request:", newRequest);
+        console.log("Added withdrawal request (no login):", newRequest);
         resolve(newRequest);
     });
 };
 
-/**
- * Retrieves all withdrawal requests (primarily for the developer dashboard).
- */
 export const getAllWithdrawalRequests = (): WithdrawalRequest[] => {
     return getFromLocalStorage<WithdrawalRequest>(WITHDRAWALS_KEY);
 };
 
-/**
- * Retrieves pending withdrawal requests.
- */
 export const getPendingWithdrawalRequests = (): WithdrawalRequest[] => {
-    const all = getAllWithdrawalRequests();
-    return all.filter(req => req.status === 'pending');
+    return getAllWithdrawalRequests().filter(req => req.status === 'pending');
 };
 
-
-/**
- * Retrieves a specific withdrawal request by its ID.
- */
 export const getWithdrawalRequestById = (id: string): WithdrawalRequest | undefined => {
-    const requests = getAllWithdrawalRequests();
-    return requests.find(req => req.id === id);
+    return getAllWithdrawalRequests().find(req => req.id === id);
 };
 
-/**
- * Retrieves withdrawal requests for a specific user.
- */
+// userId is phone number
 export const getWithdrawalRequestsForUser = (userId: string): WithdrawalRequest[] => {
-    const requests = getAllWithdrawalRequests();
-    return requests.filter(req => req.userId === userId);
+    return getAllWithdrawalRequests().filter(req => req.userId === userId);
 };
 
-/**
- * Retrieves the withdrawal request associated with a specific investment ID.
- * Assumes only one withdrawal per investment.
- */
 export const getWithdrawalRequestForInvestment = (investmentId: string): WithdrawalRequest | null => {
-    const requests = getAllWithdrawalRequests();
-    return requests.find(req => req.investmentId === investmentId) ?? null;
+    return getAllWithdrawalRequests().find(req => req.investmentId === investmentId) ?? null;
 };
 
-
-/**
- * Updates the status of a withdrawal request (e.g., 'processing', 'completed', 'rejected').
- * Used by the developer dashboard.
- */
 export const updateWithdrawalStatus = async (
     requestId: string,
     status: 'processing' | 'completed' | 'rejected',
@@ -135,12 +96,11 @@ export const updateWithdrawalStatus = async (
         if (status === 'rejected' && details?.rejectionReason) {
             requests[index].rejectionReason = details.rejectionReason;
         } else if (status !== 'rejected') {
-             requests[index].rejectionReason = null; // Clear reason if not rejected
+             requests[index].rejectionReason = null;
         }
 
-
         setToLocalStorage(WITHDRAWALS_KEY, requests);
-        console.log(`Updated withdrawal request ${requestId} status to ${status}`);
+        console.log(`Updated withdrawal request ${requestId} status to ${status} (no login)`);
         resolve(requests[index]);
      });
 };

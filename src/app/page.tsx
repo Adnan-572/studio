@@ -2,92 +2,112 @@
 "use client";
 
 import * as React from 'react';
-import type { Plan } from '@/components/investment-plans';
 import { InvestmentPlans } from '@/components/investment-plans';
 import { Dashboard } from '@/components/dashboard';
 import { ReferralSystem } from '@/components/referral-system';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, CheckCircle, LogIn } from 'lucide-react';
+import { Loader2, CheckCircle } from 'lucide-react';
 import { getApprovedInvestmentForUser, getPendingInvestmentForUser, type InvestmentSubmission } from '@/lib/investment-store';
 import { getWithdrawalRequestForInvestment, type WithdrawalRequest } from '@/lib/withdrawal-store';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import type { User } from '@/lib/auth-store'; // Import User type
+import { Input } from '@/components/ui/input'; // For phone number input
+import { Label } from '@/components/ui/label'; // For phone number input
 
-interface HomePageProps {
-  currentUser: User | null; // Receive currentUser from layout
-}
-
-export default function Home({ currentUser }: HomePageProps) {
+export default function Home() {
   const [activeInvestment, setActiveInvestment] = React.useState<InvestmentSubmission | null>(null);
   const [pendingInvestment, setPendingInvestment] = React.useState<InvestmentSubmission | null>(null);
   const [withdrawalRequest, setWithdrawalRequest] = React.useState<WithdrawalRequest | null>(null);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
-  const [showInvestmentPlans, setShowInvestmentPlans] = React.useState<boolean>(false);
+  const [showInvestmentPlans, setShowInvestmentPlans] = React.useState<boolean>(true); // Show plans by default
+  const [userPhoneNumber, setUserPhoneNumber] = React.useState<string>(''); // To query investments
+
+  const LOCAL_STORAGE_PHONE_KEY = 'rupay_user_phone';
+
+  React.useEffect(() => {
+    // Load phone number from localStorage if previously entered
+    const storedPhoneNumber = localStorage.getItem(LOCAL_STORAGE_PHONE_KEY);
+    if (storedPhoneNumber) {
+      setUserPhoneNumber(storedPhoneNumber);
+    }
+    setIsLoading(false); // Initial loading is just for phone number
+  }, []);
 
   const checkStatus = React.useCallback(() => {
-    if (!currentUser?.id) {
+    if (!userPhoneNumber) {
+      // If no phone number entered/stored, can't fetch specific investments
       setActiveInvestment(null);
       setPendingInvestment(null);
       setWithdrawalRequest(null);
       setIsLoading(false);
-      setShowInvestmentPlans(false); // Reset if user logs out
       return;
     }
 
     setIsLoading(true);
-    console.log("Checking status for user:", currentUser.id);
-    const approved = getApprovedInvestmentForUser(currentUser.id);
-    const pending = getPendingInvestmentForUser(currentUser.id);
+    const approved = getApprovedInvestmentForUser(userPhoneNumber); // Query by phone number
+    const pending = getPendingInvestmentForUser(userPhoneNumber);   // Query by phone number
     let withdrawal: WithdrawalRequest | null = null;
 
     if (approved) {
       withdrawal = getWithdrawalRequestForInvestment(approved.id!);
-      console.log("Found Withdrawal Request:", withdrawal);
     }
-
-    console.log("Found Approved Investment:", approved);
-    console.log("Found Pending Investment:", pending);
 
     setActiveInvestment(approved);
     setPendingInvestment(pending);
     setWithdrawalRequest(withdrawal);
     setIsLoading(false);
 
-    // If user becomes active or pending, hide the plan selection view
     if (approved || pending) {
-        setShowInvestmentPlans(false);
+      setShowInvestmentPlans(false); // Hide plans if investment is active/pending
+    } else {
+      setShowInvestmentPlans(true); // Show plans if no active/pending
     }
-
-  }, [currentUser]);
-
+  }, [userPhoneNumber]);
 
   React.useEffect(() => {
-    checkStatus(); // Initial check
-
-    const interval = setInterval(checkStatus, 10000); // Periodic check
-    return () => clearInterval(interval);
-
-  }, [currentUser, checkStatus]);
-
-
-  const handleStartNewInvestment = () => {
-    if (!activeInvestment && !pendingInvestment && (!withdrawalRequest || withdrawalRequest.status === 'completed' || withdrawalRequest.status === 'rejected')) {
+    if (userPhoneNumber) { // Only check status if phone number is available
+      checkStatus();
+      const interval = setInterval(checkStatus, 10000);
+      return () => clearInterval(interval);
+    } else {
+        // No phone number, ensure we are in a state to show plans or prompt for phone
         setActiveInvestment(null);
         setPendingInvestment(null);
         setWithdrawalRequest(null);
-        setShowInvestmentPlans(false); // Ensure plans are hidden initially when starting new
-        setIsLoading(false); 
-        checkStatus();
-    } else {
-        console.log("Cannot start new investment while another is active/pending or withdrawal is not completed/rejected.");
+        setShowInvestmentPlans(true);
+        setIsLoading(false);
     }
+  }, [userPhoneNumber, checkStatus]);
+
+  const handleInvestmentSubmissionSuccess = (submittedPhoneNumber: string) => {
+    setUserPhoneNumber(submittedPhoneNumber);
+    localStorage.setItem(LOCAL_STORAGE_PHONE_KEY, submittedPhoneNumber);
+    setShowInvestmentPlans(false);
+    checkStatus(); // Immediately refresh status
   };
 
-  const handleInvestmentSubmissionSuccess = () => {
-    console.log("Investment submitted, refreshing status...");
-    setShowInvestmentPlans(false); // Hide plans view after submission
-    checkStatus(); // Immediately refresh status after submission
+  const handleStartNewInvestment = () => {
+    // This effectively resets the view to show plans again
+    // We might want to clear the stored phone number or handle this differently
+    setActiveInvestment(null);
+    setPendingInvestment(null);
+    setWithdrawalRequest(null);
+    setShowInvestmentPlans(true);
+    setIsLoading(false);
+    // If we don't clear userPhoneNumber, checkStatus will run again with it.
+    // For a true "new investment cycle for potentially a different user",
+    // we might clear userPhoneNumber and localStorage
+    // localStorage.removeItem(LOCAL_STORAGE_PHONE_KEY);
+    // setUserPhoneNumber('');
+  };
+
+  const handlePhoneNumberSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const phoneInput = (e.target as HTMLFormElement).elements.namedItem('phone-number-input') as HTMLInputElement;
+    if (phoneInput && phoneInput.value) {
+      setUserPhoneNumber(phoneInput.value);
+      localStorage.setItem(LOCAL_STORAGE_PHONE_KEY, phoneInput.value);
+    }
   };
 
 
@@ -99,39 +119,31 @@ export default function Home({ currentUser }: HomePageProps) {
     );
   }
 
-  if (!currentUser) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert className="max-w-lg text-center mx-auto">
-          <LogIn className="h-5 w-5" />
-          <AlertTitle className="text-xl font-semibold">Please Login</AlertTitle>
-          <AlertDescription>
-            You need to login or register to invest in our plans.
-            You can explore the available plans below. Please use the button in the header to login/register.
-          </AlertDescription>
-        </Alert>
-         <Separator className="my-12" />
-          <section id="investment-plans-preview" className="w-full">
-             <h2 className="text-2xl font-semibold tracking-tight text-center mb-6">Explore Our Investment Plans</h2>
-            <InvestmentPlans
-              userId={null}
-              userName={null}
-              isAuthenticated={false}
-              onSubmissionSuccess={() => { /* No action needed for unauthenticated users */ }}
-            />
-          </section>
-      </div>
-    );
-  }
-
-
   return (
     <div className="container mx-auto px-4 py-8 space-y-12">
-      {activeInvestment ? (
+      {!userPhoneNumber && !activeInvestment && !pendingInvestment && (
+        <Card className="max-w-lg mx-auto">
+          <CardHeader>
+            <CardTitle>View Your Investments</CardTitle>
+            <CardDescription>Enter your phone number to see your investment status or explore plans below.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePhoneNumberSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="phone-number-input">Phone Number</Label>
+                <Input id="phone-number-input" type="tel" placeholder="e.g., 03001234567" required />
+              </div>
+              <Button type="submit" className="w-full">View My Status</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {userPhoneNumber && activeInvestment && (
         <section id="dashboard">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold tracking-tight text-primary">
-              Your Investment Dashboard
+              Your Investment Dashboard ({userPhoneNumber})
             </h1>
             {activeInvestment && (!withdrawalRequest || withdrawalRequest.status === 'completed' || withdrawalRequest.status === 'rejected') && (
                  <Button onClick={handleStartNewInvestment} variant="outline" size="sm">
@@ -141,60 +153,48 @@ export default function Home({ currentUser }: HomePageProps) {
           </div>
           <Dashboard plan={activeInvestment} />
         </section>
-      ) : pendingInvestment ? (
+      )}
+
+      {userPhoneNumber && pendingInvestment && !activeInvestment && (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-300px)]">
           <Alert className="max-w-md text-center">
              <CheckCircle className="h-4 w-4" />
             <AlertTitle className="text-xl font-semibold">Investment Pending Approval</AlertTitle>
             <AlertDescription>
-              Your investment proof for the <strong>{pendingInvestment.title}</strong> (Amount: <strong>PKR {pendingInvestment.investmentAmount.toLocaleString()}</strong>) has been submitted and is awaiting review. Your dashboard will become active once approved.
+              Your investment proof for the <strong>{pendingInvestment.title}</strong> (Amount: <strong>PKR {pendingInvestment.investmentAmount.toLocaleString()}</strong>) under phone number <strong>{userPhoneNumber}</strong> has been submitted and is awaiting review.
             </AlertDescription>
           </Alert>
         </div>
-      ) : ( // Logged in, no active/pending investment
+      )}
+
+      {showInvestmentPlans && !activeInvestment && !pendingInvestment && (
         <>
           <section id="welcome" className="text-center py-12">
             <h1 className="mb-4 text-4xl font-bold tracking-tight text-primary">
-              Welcome, {currentUser.userName || currentUser.phoneNumber}!
+              Welcome to Rupay Growth!
             </h1>
             <p className="mb-8 text-lg text-muted-foreground max-w-xl mx-auto">
-              You are successfully logged in. You can manage your account or explore investment options to grow your capital.
+              Explore investment options to grow your capital.
+              {userPhoneNumber && ` Viewing for phone: ${userPhoneNumber}.`}
             </p>
-            {!showInvestmentPlans && (
-              <Button onClick={() => setShowInvestmentPlans(true)} size="lg" className="bg-primary hover:bg-primary/90">
-                Explore Investment Plans
-              </Button>
-            )}
           </section>
-
-          {showInvestmentPlans && (
-            <>
-              <Separator />
-              <section id="investment-plans" className="pt-8">
-                <h2 className="text-3xl font-semibold tracking-tight text-center mb-8">
-                  Our Investment Opportunities
-                </h2>
-                <InvestmentPlans
-                  userId={currentUser.id}
-                  userName={currentUser.userName || currentUser.phoneNumber}
-                  isAuthenticated={true}
-                  onSubmissionSuccess={handleInvestmentSubmissionSuccess}
-                />
-              </section>
-            </>
-          )}
+          <Separator />
+          <section id="investment-plans" className="pt-8">
+            <h2 className="text-3xl font-semibold tracking-tight text-center mb-8">
+              Our Investment Opportunities
+            </h2>
+            <InvestmentPlans
+              onSubmissionSuccess={handleInvestmentSubmissionSuccess}
+              // userId and userName are now collected within InvestmentPlans
+            />
+          </section>
         </>
       )}
 
-      {!isLoading && currentUser && (
-         <>
-            <Separator />
-            <section id="referral-system">
-                <ReferralSystem userId={currentUser.id} />
-            </section>
-         </>
-      )}
+      <Separator />
+      <section id="referral-system">
+        <ReferralSystem />
+      </section>
     </div>
   );
 }
-

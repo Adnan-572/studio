@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation'; // For redirection
+import { useRouter } from 'next/navigation';
 import {
   getAllPendingInvestments,
   approveInvestment,
@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, isPast } from 'date-fns';
 import Image from 'next/image';
-import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Ban, ShieldAlert } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Ban } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -36,9 +36,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { getCurrentUser, type User } from '@/lib/auth-store'; // Import auth functions
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-
 
 const formatCurrency = (amount: number): string => {
   if (!Number.isFinite(amount)) {
@@ -49,8 +46,6 @@ const formatCurrency = (amount: number): string => {
 
 
 export default function DeveloperDashboardPage() {
-  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
-  const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
   const router = useRouter();
 
   const [pendingInvestments, setPendingInvestments] = React.useState<InvestmentSubmission[]>([]);
@@ -68,56 +63,28 @@ export default function DeveloperDashboardPage() {
 
   const { toast } = useToast();
 
-  React.useEffect(() => {
-    const user = getCurrentUser();
-    if (user && user.userType === 'developer') {
-      setCurrentUser(user);
-    } else {
-      // Optionally redirect or just show access denied
-      // router.push('/'); // Redirect to home if not developer
-    }
-    setIsCheckingAuth(false);
-  }, [router]);
-
-
-  const fetchPendingInvestments = React.useCallback(() => {
-    if (!currentUser) return;
+  const fetchAllData = React.useCallback(() => {
     setIsLoadingInvestments(true);
     const pending = getAllPendingInvestments();
     setPendingInvestments(pending);
     setIsLoadingInvestments(false);
-  }, [currentUser]);
 
-  const fetchActiveInvestments = React.useCallback(() => {
-    if (!currentUser) return;
     setIsLoadingActive(true);
     const active = getAllApprovedInvestments();
     setActiveInvestments(active);
     setIsLoadingActive(false);
-  }, [currentUser]);
 
-  const fetchPendingWithdrawals = React.useCallback(() => {
-    if (!currentUser) return;
     setIsLoadingWithdrawals(true);
-    const pending = getPendingWithdrawalRequests();
-    setPendingWithdrawals(pending);
+    const pendingW = getPendingWithdrawalRequests();
+    setPendingWithdrawals(pendingW);
     setIsLoadingWithdrawals(false);
-  }, [currentUser]);
+  }, []);
 
   React.useEffect(() => {
-    if (currentUser) { // Only fetch if user is a developer
-      fetchPendingInvestments();
-      fetchActiveInvestments();
-      fetchPendingWithdrawals();
-
-      const interval = setInterval(() => {
-          fetchPendingInvestments();
-          fetchActiveInvestments();
-          fetchPendingWithdrawals();
-      }, 15000);
-      return () => clearInterval(interval);
-    }
-  }, [currentUser, fetchPendingInvestments, fetchActiveInvestments, fetchPendingWithdrawals]);
+    fetchAllData();
+    const interval = setInterval(fetchAllData, 15000);
+    return () => clearInterval(interval);
+  }, [fetchAllData]);
 
 
   const handleApproveInvestment = async (submissionId: string) => {
@@ -125,8 +92,7 @@ export default function DeveloperDashboardPage() {
     try {
       await approveInvestment(submissionId);
       toast({ title: 'Investment Approved', description: `Investment ID ${submissionId} has been approved.` });
-      fetchPendingInvestments(); 
-      fetchActiveInvestments();
+      fetchAllData();
     } catch (error) {
       console.error('Approval error:', error);
       toast({ title: 'Approval Failed', description: `Could not approve investment ${submissionId}.`, variant: 'destructive' });
@@ -140,7 +106,7 @@ export default function DeveloperDashboardPage() {
     try {
       await rejectInvestment(submissionId);
       toast({ title: 'Investment Rejected', description: `Investment ID ${submissionId} has been rejected.`, variant: 'destructive' });
-      fetchPendingInvestments();
+      fetchAllData();
     } catch (error) {
       console.error('Rejection error:', error);
       toast({ title: 'Rejection Failed', description: `Could not reject investment ${submissionId}.`, variant: 'destructive' });
@@ -169,7 +135,7 @@ export default function DeveloperDashboardPage() {
       try {
           await updateWithdrawalStatus(requestId, 'completed', { transactionId: transactionId.trim() });
           toast({ title: 'Withdrawal Completed', description: `Withdrawal ${requestId} marked as completed.` });
-          fetchPendingWithdrawals();
+          fetchAllData();
           closeWithdrawalActionModal();
       } catch (error) {
           console.error('Withdrawal completion error:', error);
@@ -189,7 +155,7 @@ export default function DeveloperDashboardPage() {
        try {
            await updateWithdrawalStatus(requestId, 'rejected', { rejectionReason: rejectionReason.trim() });
            toast({ title: 'Withdrawal Rejected', description: `Withdrawal ${requestId} has been rejected.`, variant: 'destructive' });
-           fetchPendingWithdrawals();
+           fetchAllData();
            closeWithdrawalActionModal();
        } catch (error) {
            console.error('Withdrawal rejection error:', error);
@@ -201,31 +167,6 @@ export default function DeveloperDashboardPage() {
 
   const openImageModal = (imageDataUrl: string) => setSelectedImage(imageDataUrl);
   const closeImageModal = () => setSelectedImage(null);
-
-  if (isCheckingAuth) {
-    return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Verifying access...</p>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="container mx-auto px-4 py-8 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-        <Alert variant="destructive" className="max-w-lg">
-          <ShieldAlert className="h-5 w-5" />
-          <AlertTitle className="text-xl font-semibold">Access Denied</AlertTitle>
-          <AlertDescription>
-            You do not have permission to view this page. This area is for developers only.
-            Please login with a developer account or contact support if you believe this is an error.
-          </AlertDescription>
-        </Alert>
-        <Button onClick={() => router.push('/')} className="mt-6">Go to Homepage</Button>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -270,7 +211,7 @@ export default function DeveloperDashboardPage() {
                                       <TableRow key={submission.id}>
                                           <TableCell>
                                               <div>{submission.userName}</div>
-                                              <div className="text-xs text-muted-foreground">{submission.userId}</div>
+                                              <div className="text-xs text-muted-foreground">{submission.userId}</div> {/* userId is phone number */}
                                           </TableCell>
                                           <TableCell>{submission.title}</TableCell>
                                           <TableCell className="text-right font-medium">{formatCurrency(submission.investmentAmount)}</TableCell>

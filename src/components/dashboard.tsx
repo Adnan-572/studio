@@ -5,10 +5,10 @@ import * as React from 'react';
 import type { InvestmentSubmission } from '@/lib/investment-store'; // Use InvestmentSubmission type
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { differenceInDays, addDays, format, isPast } from 'date-fns'; // Import isPast
+import { differenceInDays, addDays, format, isPast } from 'date-fns'; 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DollarSign, CalendarDays, TrendingUp, Percent, Hourglass, User, CheckCircle, Banknote, Wallet, Info, Loader2, Gift } from 'lucide-react'; // Added Gift icon for bonus
+import { DollarSign, CalendarDays, TrendingUp, Percent, Hourglass, User, CheckCircle, Banknote, Wallet, Info, Loader2, Gift } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,23 +16,21 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogClose, // Keep DialogClose
   DialogFooter,
-  DialogClose
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { addWithdrawalRequest, getWithdrawalRequestForInvestment, type WithdrawalRequest } from '@/lib/withdrawal-store'; // Import withdrawal functions
+import { addWithdrawalRequest, getWithdrawalRequestForInvestment, type WithdrawalRequest } from '@/lib/withdrawal-store'; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 interface DashboardProps {
-  plan: InvestmentSubmission; // Use InvestmentSubmission which includes startDate and approvalDate
+  plan: InvestmentSubmission; 
 }
 
-// Helper function to format currency (ensure it's consistent)
 const formatCurrency = (amount: number): string => {
   if (!Number.isFinite(amount)) {
     return 'PKR 0.00';
@@ -52,7 +50,7 @@ interface DailyProfitEntry {
 export function Dashboard({ plan }: DashboardProps) {
   const { toast } = useToast();
   const startDate = React.useMemo(() => new Date(plan.approvalDate!), [plan.approvalDate]);
-  const referralBonus = React.useMemo(() => plan.referralBonusPercent ?? 0, [plan.referralBonusPercent]); // Get referral bonus
+  const referralBonus = React.useMemo(() => plan.referralBonusPercent ?? 0, [plan.referralBonusPercent]);
   const [currentDate, setCurrentDate] = React.useState<Date>(new Date());
   const [dailyProfits, setDailyProfits] = React.useState<DailyProfitEntry[]>([]);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = React.useState(false);
@@ -63,35 +61,27 @@ export function Dashboard({ plan }: DashboardProps) {
   const [isLoadingWithdrawalStatus, setIsLoadingWithdrawalStatus] = React.useState(true);
 
   React.useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentDate(new Date());
-    }, 1000 * 60); // Update current date every minute
-
+    const interval = setInterval(() => setCurrentDate(new Date()), 1000 * 60);
     return () => clearInterval(interval);
   }, []);
 
-  // Recalculate profits when plan or referral bonus changes
   React.useEffect(() => {
     const calculateProfits = () => {
       const profits: DailyProfitEntry[] = [];
       let cumulativeMin = 0;
       let cumulativeMax = 0;
       const investmentAmount = plan.investmentAmount;
+      if (!startDate) return;
 
-      if (!startDate) return; // Don't calculate if start date isn't set
-
-      // Calculate base daily profit + referral bonus
       const effectiveDailyProfitMin = plan.dailyProfitMin + referralBonus;
       const effectiveDailyProfitMax = plan.dailyProfitMax + referralBonus;
 
       for (let i = 1; i <= plan.duration; i++) {
-        const profitDate = addDays(startDate, i - 1); // Calculate date for this profit day
+        const profitDate = addDays(startDate, i - 1);
         const dailyMin = (investmentAmount * effectiveDailyProfitMin) / 100;
         const dailyMax = (investmentAmount * effectiveDailyProfitMax) / 100;
-
         cumulativeMin += dailyMin;
         cumulativeMax += dailyMax;
-
         profits.push({
           day: i,
           date: format(profitDate, 'MMM dd, yyyy'),
@@ -103,11 +93,9 @@ export function Dashboard({ plan }: DashboardProps) {
       }
       setDailyProfits(profits);
     };
-
     calculateProfits();
-  }, [plan, startDate, referralBonus]); // Add referralBonus dependency
+  }, [plan, startDate, referralBonus]);
 
-  // Check for existing withdrawal request when component mounts or plan changes
   React.useEffect(() => {
     if (plan.id) {
       setIsLoadingWithdrawalStatus(true);
@@ -117,20 +105,16 @@ export function Dashboard({ plan }: DashboardProps) {
     }
   }, [plan.id]);
 
-
-  if (!startDate) {
-    return <p>Loading investment data...</p>; // Or some loading indicator
+  if (!startDate || !plan.approvalDate) { // Ensure approvalDate is present
+    return <p>Loading investment data or investment not yet approved...</p>;
   }
 
   const endDate = addDays(startDate, plan.duration);
-  const isPlanComplete = isPast(endDate); // Check if the end date is in the past
-
-  const daysElapsed = Math.min(plan.duration, Math.max(0, differenceInDays(currentDate, startDate))); // Cap elapsed days at duration
+  const isPlanComplete = isPast(endDate);
+  const daysElapsed = Math.min(plan.duration, Math.max(0, differenceInDays(currentDate, startDate)));
   const daysRemaining = Math.max(0, plan.duration - daysElapsed);
   const progress = Math.min(100, Math.max(0,(daysElapsed / plan.duration) * 100));
 
-
-  // Determine current cumulative profit based on days elapsed
    const currentProfitIndex = Math.min(daysElapsed, plan.duration) - 1;
    const currentCumulativeMin = currentProfitIndex >= 0 ? dailyProfits[currentProfitIndex]?.cumulativeMin ?? 0 : 0;
    const currentCumulativeMax = currentProfitIndex >= 0 ? dailyProfits[currentProfitIndex]?.cumulativeMax ?? 0 : 0;
@@ -138,8 +122,6 @@ export function Dashboard({ plan }: DashboardProps) {
      ? formatCurrency(currentCumulativeMin)
      : `${formatCurrency(currentCumulativeMin)} – ${formatCurrency(currentCumulativeMax)}`;
 
-
-  // Final total return calculation
   const finalTotalProfitMin = dailyProfits[plan.duration - 1]?.cumulativeMin ?? 0;
   const finalTotalProfitMax = dailyProfits[plan.duration - 1]?.cumulativeMax ?? 0;
   const finalTotalReturnMin = plan.investmentAmount + finalTotalProfitMin;
@@ -151,46 +133,29 @@ export function Dashboard({ plan }: DashboardProps) {
     ? formatCurrency(finalTotalProfitMin)
     : `${formatCurrency(finalTotalProfitMin)} – ${formatCurrency(finalTotalProfitMax)}`;
 
-
-  // Calculate effective daily profit range text including bonus
    const effectiveDailyProfitMin = plan.dailyProfitMin + referralBonus;
    const effectiveDailyProfitMax = plan.dailyProfitMax + referralBonus;
    const effectiveDailyProfitRangeText = effectiveDailyProfitMin === effectiveDailyProfitMax
      ? `${effectiveDailyProfitMin.toFixed(1)}%`
      : `${effectiveDailyProfitMin.toFixed(1)}% – ${effectiveDailyProfitMax.toFixed(1)}%`;
 
-
-  const planIcon = plan.icon ? React.createElement(plan.icon, { className: "h-6 w-6" }) : <DollarSign className="h-6 w-6" />;
-
+  const PlanIconComponent = plan.iconName ? TrendingUp : DollarSign; // Defaulting, icon resolution needs care
+  // Ideally, a mapping from iconName to component would be better if icons are complex
 
   const handleRequestWithdrawal = async () => {
       if (!withdrawalMethod || !accountNumber.trim() || !plan.id) {
-          toast({
-              variant: "destructive",
-              title: "Missing Information",
-              description: "Please select a withdrawal method and enter your account number.",
-          });
+          toast({ variant: "destructive", title: "Missing Information", description: "Please select a withdrawal method and enter your account number." });
           return;
       }
-
-      // Basic validation for account number (simple check for now)
       if (!/^\d+$/.test(accountNumber.trim())) {
-           toast({
-              variant: "destructive",
-              title: "Invalid Account Number",
-              description: "Account number should only contain digits.",
-          });
+           toast({ variant: "destructive", title: "Invalid Account Number", description: "Account number should only contain digits." });
           return;
       }
-
       setIsSubmittingWithdrawal(true);
       try {
-          // Use the maximum potential return as the withdrawal amount for simplicity
-          // In a real scenario, this would be the exact calculated final amount.
           const withdrawalAmount = finalTotalReturnMax;
-
           const request: Omit<WithdrawalRequest, 'id'> = {
-              userId: plan.userId,
+              userId: plan.userId, // phone number
               userName: plan.userName,
               investmentId: plan.id,
               investmentTitle: plan.title,
@@ -200,49 +165,32 @@ export function Dashboard({ plan }: DashboardProps) {
               requestDate: new Date().toISOString(),
               status: 'pending',
           };
-
-          await addWithdrawalRequest(request);
-
-           // Update the state to reflect the new request
-          setExistingWithdrawalRequest({ ...request, id: 'temp-id' }); // Use a temp ID until properly fetched
-
-
-          toast({
-              title: "Withdrawal Requested",
-              description: `Your request to withdraw ${formatCurrency(withdrawalAmount)} has been submitted. Processing takes up to 3 business days.`,
-              variant: "default",
-          });
+          const newRequest = await addWithdrawalRequest(request);
+          setExistingWithdrawalRequest(newRequest); // Update state with the new request
+          toast({ title: "Withdrawal Requested", description: `Your request to withdraw ${formatCurrency(withdrawalAmount)} has been submitted.`, variant: "default" });
           setIsWithdrawalModalOpen(false);
-          // Reset form state
           setWithdrawalMethod(null);
           setAccountNumber('');
-
       } catch (error) {
           console.error("Withdrawal request error:", error);
-          toast({
-              variant: "destructive",
-              title: "Request Failed",
-              description: "Could not submit your withdrawal request. Please try again later.",
-          });
+          toast({ variant: "destructive", title: "Request Failed", description: "Could not submit your withdrawal request." });
       } finally {
           setIsSubmittingWithdrawal(false);
       }
   };
-
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl text-primary">
-            {planIcon} {plan.title} Overview
+            <PlanIconComponent className="h-6 w-6" /> {plan.title} Overview
           </CardTitle>
           <CardDescription>
-              Investment started on {format(startDate, 'PPP')} by {plan.userName}. Approved on {format(new Date(plan.approvalDate!), 'Pp')}.
+              Investment for {plan.userName} ({plan.userId}). Approved on {format(startDate, 'PPP')}.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {/* Existing Info Cards */}
           <div className="flex items-center space-x-3 rounded-md border p-4 bg-muted/50">
               <User className="h-6 w-6 text-muted-foreground" />
               <div>
@@ -283,7 +231,6 @@ export function Dashboard({ plan }: DashboardProps) {
               <p className="text-lg font-semibold">{format(endDate, 'PPP')}</p>
             </div>
           </div>
-           {/* Show current profit only if plan is not complete */}
            {!isPlanComplete && (
                <div className="flex items-center space-x-3 rounded-md border p-4 bg-primary/10 text-primary">
                 <TrendingUp className="h-6 w-6" />
@@ -293,7 +240,6 @@ export function Dashboard({ plan }: DashboardProps) {
                 </div>
               </div>
            )}
-           {/* Show final profit if plan is complete */}
            {isPlanComplete && (
               <div className="flex items-center space-x-3 rounded-md border p-4 bg-primary/10 text-primary">
                  <TrendingUp className="h-6 w-6" />
@@ -303,27 +249,23 @@ export function Dashboard({ plan }: DashboardProps) {
                   </div>
               </div>
            )}
-
            <div className="flex items-center space-x-3 rounded-md border p-4 bg-green-600/10 text-green-700 dark:text-green-400">
-             <CheckCircle className="h-6 w-6" /> {/* Changed icon */}
+             <CheckCircle className="h-6 w-6" />
             <div>
               <p className="text-sm font-medium leading-none">Total Return (Est.)</p>
               <p className="text-lg font-semibold">{finalTotalReturnText}</p>
             </div>
           </div>
-
-            {/* Add Referral Bonus Card if bonus > 0 */}
             {referralBonus > 0 && (
                 <div className="flex items-center space-x-3 rounded-md border p-4 bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 md:col-span-3">
                     <Gift className="h-6 w-6" />
                     <div>
                         <p className="text-sm font-medium leading-none">Referral Bonus Applied</p>
                         <p className="text-lg font-semibold">+{referralBonus.toFixed(1)}% Daily Profit</p>
-                         <p className="text-xs text-muted-foreground">Your daily profit includes an extra {referralBonus.toFixed(1)}% thanks to your referrals!</p>
+                         <p className="text-xs text-muted-foreground">Your daily profit includes an extra {referralBonus.toFixed(1)}% (details may vary).</p>
                     </div>
                 </div>
             )}
-
         </CardContent>
       </Card>
 
@@ -337,7 +279,6 @@ export function Dashboard({ plan }: DashboardProps) {
         <CardContent>
           <Progress value={progress} className="w-full h-4" />
            <p className="text-right text-sm text-muted-foreground mt-1">{progress.toFixed(1)}% complete</p>
-           {/* Withdrawal Button */}
            {isPlanComplete && (
                 <div className="mt-6 text-center">
                     {isLoadingWithdrawalStatus ? (
@@ -373,7 +314,7 @@ export function Dashboard({ plan }: DashboardProps) {
            <CardDescription>Showing potential profit range for each day (including referral bonus).</CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[300px] w-full"> {/* Adjust height as needed */}
+          <ScrollArea className="h-[300px] w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -385,20 +326,17 @@ export function Dashboard({ plan }: DashboardProps) {
               </TableHeader>
               <TableBody>
                 {dailyProfits.map((entry) => {
-                   // Highlight past/today rows
                    const entryDate = new Date(entry.date);
-                   entryDate.setHours(23, 59, 59, 999); // Consider the whole day
+                   entryDate.setHours(23, 59, 59, 999); 
                    const isPastOrToday = currentDate >= entryDate;
-
                    const dailyProfitText = entry.profitMin === entry.profitMax
                         ? formatCurrency(entry.profitMin)
                         : `${formatCurrency(entry.profitMin)} – ${formatCurrency(entry.profitMax)}`;
                     const cumulativeProfitText = entry.cumulativeMin === entry.cumulativeMax
                         ? formatCurrency(entry.cumulativeMin)
                         : `${formatCurrency(entry.cumulativeMin)} – ${formatCurrency(entry.cumulativeMax)}`;
-
                   return (
-                    <TableRow key={entry.day} className={isPastOrToday && !isPlanComplete ? 'bg-muted/30' : ''}> {/* Only highlight if plan not complete */}
+                    <TableRow key={entry.day} className={isPastOrToday && !isPlanComplete ? 'bg-muted/30' : ''}>
                       <TableCell className="font-medium">{entry.day}</TableCell>
                       <TableCell>{entry.date}</TableCell>
                       <TableCell className={`text-right ${isPastOrToday && !isPlanComplete ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
@@ -416,7 +354,6 @@ export function Dashboard({ plan }: DashboardProps) {
         </CardContent>
       </Card>
 
-       {/* Withdrawal Request Modal */}
         <Dialog open={isWithdrawalModalOpen} onOpenChange={setIsWithdrawalModalOpen}>
             <DialogContent className="sm:max-w-[480px]">
                 <DialogHeader>
@@ -428,7 +365,6 @@ export function Dashboard({ plan }: DashboardProps) {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-6 py-4">
-                    {/* Withdrawal Method Selection */}
                     <div className="space-y-3">
                         <Label className="text-base font-semibold">Select Withdrawal Method</Label>
                         <RadioGroup
@@ -452,28 +388,24 @@ export function Dashboard({ plan }: DashboardProps) {
                             </div>
                         </RadioGroup>
                     </div>
-
-                    {/* Account Number Input */}
                     <div className="space-y-2">
                         <Label htmlFor="account-number" className="text-base font-semibold">Account Number</Label>
                         <Input
                             id="account-number"
                             type="text"
-                            inputMode="numeric" // Important for mobile keyboards
-                            pattern="[0-9]*" // Helps with validation
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={accountNumber}
-                            onChange={(e) => setAccountNumber(e.target.value.replace(/[^0-9]/g, ''))} // Allow only digits
+                            onChange={(e) => setAccountNumber(e.target.value.replace(/[^0-9]/g, ''))}
                             placeholder="Enter your account number"
                             required
                          />
                     </div>
-
-                    {/* Important Note */}
                     <Alert variant="default">
                         <Info className="h-4 w-4" />
                         <AlertTitle>Important Note</AlertTitle>
                         <AlertDescription>
-                            Withdrawals are typically processed within <strong>3 business days</strong> after the request is submitted. Funds will be sent to the account number provided. Please double-check the details before submitting.
+                            Withdrawals are typically processed within <strong>3 business days</strong>. Funds will be sent to the account number provided. Please double-check details.
                         </AlertDescription>
                     </Alert>
                 </div>
@@ -496,7 +428,6 @@ export function Dashboard({ plan }: DashboardProps) {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-
     </div>
   );
 }
