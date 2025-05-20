@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -12,16 +13,23 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'picsum.photos',
+        hostname: 'placehold.co', // For placeholder images
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com', // For Firebase Storage images
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
-  allowedDevOrigins: [
-    'http://localhost:5000',
-    'http://9005-idx-studio-1746374189150.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev',
-  ],
+  // Remove allowedDevOrigins if not needed for specific Genkit/Firebase emulator setups
+  // allowedDevOrigins: [ 
+  //   'http://localhost:5000',
+  //   'http://9005-idx-studio-1746374189150.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev',
+  // ],
 };
 
 export default nextConfig;
