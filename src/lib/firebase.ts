@@ -64,12 +64,12 @@ if (typeof window === 'undefined') {
 }
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDv0Gs2rV_UHLgCPeCgL4bz_EdWyN21vbU",
+  authDomain: "rupay-growth.firebaseapp.com",
+  projectId: "rupay-growth",
+  storageBucket: "rupay-growth.firebasestorage.app",
+  messagingSenderId: "270300478181",
+  appId: "1:270300478181:web:26cc2bfe4569eddb08320c"
 };
 
 // This log helps verify the actual config object being used for initialization.

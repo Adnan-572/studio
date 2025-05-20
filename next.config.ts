@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
   // Remove allowedDevOrigins if not needed for specific Genkit/Firebase emulator setups
   // allowedDevOrigins: [ 
   //   'http://localhost:5000',
-  //   'http://9005-idx-studio-1746374189150.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev',
+  //   'http://3001-idx-studio-1746374189150.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev',
   // ],
 };
 
