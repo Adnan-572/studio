@@ -11,31 +11,30 @@ import { getApprovedInvestmentForUser, getPendingInvestmentForUser, type Investm
 import { getWithdrawalRequestForInvestment, type WithdrawalRequest } from '@/lib/withdrawal-store';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Input } from '@/components/ui/input'; // For phone number input
-import { Label } from '@/components/ui/label'; // For phone number input
+import { Input } from '@/components/ui/input'; 
+import { Label } from '@/components/ui/label'; 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Added Card imports
 
 export default function Home() {
   const [activeInvestment, setActiveInvestment] = React.useState<InvestmentSubmission | null>(null);
   const [pendingInvestment, setPendingInvestment] = React.useState<InvestmentSubmission | null>(null);
   const [withdrawalRequest, setWithdrawalRequest] = React.useState<WithdrawalRequest | null>(null);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
-  const [showInvestmentPlans, setShowInvestmentPlans] = React.useState<boolean>(true); // Show plans by default
-  const [userPhoneNumber, setUserPhoneNumber] = React.useState<string>(''); // To query investments
+  const [showInvestmentPlans, setShowInvestmentPlans] = React.useState<boolean>(true); 
+  const [userPhoneNumber, setUserPhoneNumber] = React.useState<string>(''); 
 
   const LOCAL_STORAGE_PHONE_KEY = 'rupay_user_phone';
 
   React.useEffect(() => {
-    // Load phone number from localStorage if previously entered
     const storedPhoneNumber = localStorage.getItem(LOCAL_STORAGE_PHONE_KEY);
     if (storedPhoneNumber) {
       setUserPhoneNumber(storedPhoneNumber);
     }
-    setIsLoading(false); // Initial loading is just for phone number
+    setIsLoading(false); 
   }, []);
 
   const checkStatus = React.useCallback(() => {
     if (!userPhoneNumber) {
-      // If no phone number entered/stored, can't fetch specific investments
       setActiveInvestment(null);
       setPendingInvestment(null);
       setWithdrawalRequest(null);
@@ -44,8 +43,8 @@ export default function Home() {
     }
 
     setIsLoading(true);
-    const approved = getApprovedInvestmentForUser(userPhoneNumber); // Query by phone number
-    const pending = getPendingInvestmentForUser(userPhoneNumber);   // Query by phone number
+    const approved = getApprovedInvestmentForUser(userPhoneNumber); 
+    const pending = getPendingInvestmentForUser(userPhoneNumber);   
     let withdrawal: WithdrawalRequest | null = null;
 
     if (approved) {
@@ -58,19 +57,18 @@ export default function Home() {
     setIsLoading(false);
 
     if (approved || pending) {
-      setShowInvestmentPlans(false); // Hide plans if investment is active/pending
+      setShowInvestmentPlans(false); 
     } else {
-      setShowInvestmentPlans(true); // Show plans if no active/pending
+      setShowInvestmentPlans(true); 
     }
   }, [userPhoneNumber]);
 
   React.useEffect(() => {
-    if (userPhoneNumber) { // Only check status if phone number is available
+    if (userPhoneNumber) { 
       checkStatus();
       const interval = setInterval(checkStatus, 10000);
       return () => clearInterval(interval);
     } else {
-        // No phone number, ensure we are in a state to show plans or prompt for phone
         setActiveInvestment(null);
         setPendingInvestment(null);
         setWithdrawalRequest(null);
@@ -83,22 +81,15 @@ export default function Home() {
     setUserPhoneNumber(submittedPhoneNumber);
     localStorage.setItem(LOCAL_STORAGE_PHONE_KEY, submittedPhoneNumber);
     setShowInvestmentPlans(false);
-    checkStatus(); // Immediately refresh status
+    checkStatus(); 
   };
 
   const handleStartNewInvestment = () => {
-    // This effectively resets the view to show plans again
-    // We might want to clear the stored phone number or handle this differently
     setActiveInvestment(null);
     setPendingInvestment(null);
     setWithdrawalRequest(null);
     setShowInvestmentPlans(true);
     setIsLoading(false);
-    // If we don't clear userPhoneNumber, checkStatus will run again with it.
-    // For a true "new investment cycle for potentially a different user",
-    // we might clear userPhoneNumber and localStorage
-    // localStorage.removeItem(LOCAL_STORAGE_PHONE_KEY);
-    // setUserPhoneNumber('');
   };
 
   const handlePhoneNumberSubmit = (e: React.FormEvent) => {
@@ -185,7 +176,6 @@ export default function Home() {
             </h2>
             <InvestmentPlans
               onSubmissionSuccess={handleInvestmentSubmissionSuccess}
-              // userId and userName are now collected within InvestmentPlans
             />
           </section>
         </>
