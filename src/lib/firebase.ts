@@ -4,7 +4,10 @@
 // This file initializes the Firebase app. It relies on environment variables
 // for Firebase configuration.
 //
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // CRITICAL SETUP STEP FOR RESOLVING "INVALID API KEY" OR "MISSING CONFIG" ERRORS:
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//
 // 1. CREATE THE `.env.local` FILE:
 //    - In the ROOT DIRECTORY of your project (the SAME FOLDER as `package.json`,
 //      `next.config.ts`, and the `src` folder), create a file named EXACTLY `.env.local`.
@@ -33,11 +36,12 @@
 //    - Run `npm run dev` again.
 //    - Next.js ONLY loads `.env.local` variables when the server STARTS.
 //
-// 4. CHECK TERMINAL LOGS:
+// 4. CHECK TERMINAL LOGS (WHEN YOU RUN `npm run dev`):
 //    - After restarting, check the terminal output. The `console.log` statements below
 //      will show if Next.js is picking up your environment variables. If they show
-//      "NOT SET or UNDEFINED", then there's an issue with your `.env.local` file
-//      (location, name, content) or you didn't restart the server.
+//      "NOT SET or UNDEFINED" or if the `firebaseConfig` object shows undefined values,
+//      then there's an issue with your `.env.local` file (location, name, content)
+//      OR you did not restart the server after making changes.
 // -----------------------------------------
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
@@ -49,14 +53,14 @@ import { getStorage } from 'firebase/storage';
 // This helps diagnose if Next.js is picking up the .env.local file correctly.
 if (typeof window === 'undefined') {
   console.log("--- Firebase Initialization Attempt (Server-side/Build) ---");
-  console.log("Attempting to read Firebase config from environment variables:");
-  console.log("NEXT_PUBLIC_FIREBASE_API_KEY:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "SET" : "NOT SET or UNDEFINED");
-  console.log("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ? "SET" : "NOT SET or UNDEFINED");
-  console.log("NEXT_PUBLIC_FIREBASE_PROJECT_ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? "SET" : "NOT SET or UNDEFINED");
-  console.log("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:", process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ? "SET (can be empty if not used)" : "NOT SET or UNDEFINED (can be empty if not used)");
-  console.log("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ? "SET (can be empty if not used)" : "NOT SET or UNDEFINED (can be empty if not used)");
-  console.log("NEXT_PUBLIC_FIREBASE_APP_ID:", process.env.NEXT_PUBLIC_FIREBASE_APP_ID ? "SET" : "NOT SET or UNDEFINED");
-  console.log("--- End of Environment Variable Check ---");
+  console.log("Reading environment variables for Firebase config:");
+  console.log("NEXT_PUBLIC_FIREBASE_API_KEY:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "SET" : "NOT SET or UNDEFINED - Value:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+  console.log("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ? "SET" : "NOT SET or UNDEFINED - Value:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+  console.log("NEXT_PUBLIC_FIREBASE_PROJECT_ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? "SET" : "NOT SET or UNDEFINED - Value:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+  console.log("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:", process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ? "SET (can be empty if not used)" : "NOT SET or UNDEFINED (can be empty if not used) - Value:", process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+  console.log("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ? "SET (can be empty if not used)" : "NOT SET or UNDEFINED (can be empty if not used) - Value:", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID);
+  console.log("NEXT_PUBLIC_FIREBASE_APP_ID:", process.env.NEXT_PUBLIC_FIREBASE_APP_ID ? "SET" : "NOT SET or UNDEFINED - Value:", process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
+  console.log("--- End of Raw Environment Variable Check ---");
 }
 
 const firebaseConfig = {
@@ -69,10 +73,10 @@ const firebaseConfig = {
 };
 
 // This log helps verify the actual config object being used for initialization.
-// It's useful to see if 'undefined' strings or actual undefined values are present.
-if (typeof window === 'undefined') {
-  console.log("Firebase config object constructed for initialization:", firebaseConfig);
-}
+// It runs on both server (during build/startup) and client.
+// Check your server terminal AND browser console for this log.
+console.log("Firebase config object constructed for initialization:", firebaseConfig);
+
 
 let app: FirebaseApp;
 
@@ -84,31 +88,38 @@ if (!firebaseConfig.projectId) missingKeys.push("projectId");
 if (!firebaseConfig.appId) missingKeys.push("appId"); // App ID is generally critical
 
 if (missingKeys.length > 0) {
-  const errorMessage = 
-    `CRITICAL Firebase Config Error: The following Firebase config values are missing in your .env.local file or environment: ${missingKeys.join(', ')}. ` +
+  const errorMessage =
+    `CRITICAL Firebase Config Error: The following Firebase config values are MISSING or UNDEFINED when constructing the firebaseConfig object: ${missingKeys.join(', ')}. ` +
     "Firebase will NOT be initialized. \n" +
-    "Ensure your .env.local file in the project root has all NEXT_PUBLIC_FIREBASE_ variables set correctly AND you have RESTARTED your dev server.";
+    "==> Please meticulously check your `.env.local` file in the PROJECT ROOT directory for correct variable names (e.g., NEXT_PUBLIC_FIREBASE_API_KEY) and accurate values. \n" +
+    "==> CRUCIALLY, you MUST RESTART your Next.js development server (npm run dev) after creating or changing the .env.local file. \n" +
+    "==> Review the terminal logs when your server starts for messages about 'NOT SET or UNDEFINED' environment variables.";
   console.error(errorMessage);
   // In a client-side context, you might want to throw an error or display this to the user.
   // For server-side, this log is crucial.
   // @ts-ignore - Deliberately not initializing app to prevent further errors with a bad config
-  app = null; 
+  app = null;
 } else {
   if (!getApps().length) {
     try {
       app = initializeApp(firebaseConfig);
-       if (typeof window === 'undefined') {
+      if (typeof window === 'undefined') { // Server-side log
         console.log("Firebase app initialized successfully on the server.");
+      } else { // Client-side log
+        console.log("Firebase app initialized successfully on the client.");
       }
     } catch (error) {
-      console.error("!!! Firebase initialization FAILED with error:", error);
+      console.error("!!! Firebase initialization FAILED during initializeApp(firebaseConfig) call with error:", error);
+      console.error("This usually means the config values, though present, might be malformed or incorrect for your Firebase project (e.g., wrong API key format, incorrect projectId). Double-check the values copied from your Firebase console.");
       // @ts-ignore
       app = null;
     }
   } else {
     app = getApps()[0];
     if (typeof window === 'undefined') {
-      console.log("Firebase app already initialized on the server.");
+      console.log("Firebase app already initialized on the server (reusing existing instance).");
+    } else {
+      console.log("Firebase app already initialized on the client (reusing existing instance).");
     }
   }
 }
@@ -124,13 +135,17 @@ const storage = app ? getStorage(app) : null;
 // Set persistence if auth is available and we are in a browser environment
 if (auth && typeof window !== 'undefined') {
   setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log("Firebase auth persistence set to browserLocalPersistence.");
+    })
     .catch((error) => {
       console.error("Error setting Firebase auth persistence:", error);
     });
-} else if (!auth && app && typeof window === 'undefined') {
-  console.warn("Firebase Auth instance could not be created, likely due to initialization failure. Persistence not set.");
+} else if (!auth && app && typeof window === 'undefined') { // Server-side
+  console.warn("Firebase Auth instance could not be created on the server, likely due to initialization failure. Auth persistence not set.");
+} else if (!auth && app) { // Client-side
+  console.warn("Firebase Auth instance could not be created on the client, likely due to initialization failure. Auth persistence not set.");
 }
 
 
 export { app, auth, db, storage, firebaseConfig };
-
