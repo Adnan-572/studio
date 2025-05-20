@@ -11,11 +11,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Zap, Gem, Crown, Milestone, UploadCloud, Copy, Calculator, Loader2, CheckCircle, X, User, Phone } from "lucide-react";
 import { Separator } from '@/components/ui/separator';
-import { addPendingInvestment } from '@/lib/investment-store';
+import { addPendingInvestment, type InvestmentSubmission } from '@/lib/investment-store';
 
 export interface Plan {
+  id: string; // Added id for unique key
   title: string;
   icon: React.ElementType;
+  iconName: string; // Store icon name for serialization
   investmentRange: string;
   duration: number;
   dailyProfitMin: number;
@@ -26,7 +28,7 @@ export interface Plan {
   maxInvestment: number;
 }
 
-const plansData: Omit<Plan, 'investmentAmount'>[] = [
+const plansData: Omit<Plan, 'id' | 'iconName'>[] = [
    {
     title: "Basic Plan",
     icon: TrendingUp,
@@ -81,9 +83,10 @@ const plansData: Omit<Plan, 'investmentAmount'>[] = [
   },
 ];
 
-const plans: Plan[] = plansData.map(p => ({
+const plans: Plan[] = plansData.map((p, index) => ({
   ...p,
-  investmentAmount: p.minInvestment,
+  id: `plan_${index}_${p.title.toLowerCase().replace(/\s+/g, '_')}`,
+  iconName: p.icon.displayName || p.icon.name || 'TrendingUp', // Store icon name
 }));
 
 
@@ -105,14 +108,20 @@ const formatCurrency = (amount: number) => {
   return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
-const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
-    const [amount, setAmount] = React.useState<string>(plan.minInvestment.toString());
+const ProfitCalculator: React.FC<{ plan: Plan, inputAmount?: string }> = ({ plan, inputAmount }) => {
+    const [amount, setAmount] = React.useState<string>(inputAmount || plan.minInvestment.toString());
     const [dailyProfitMin, setDailyProfitMin] = React.useState<number>(0);
     const [dailyProfitMax, setDailyProfitMax] = React.useState<number>(0);
     const [totalReturnMin, setTotalReturnMin] = React.useState<number>(0);
     const [totalReturnMax, setTotalReturnMax] = React.useState<number>(0);
     const [isValidAmount, setIsValidAmount] = React.useState<boolean>(true);
 
+    React.useEffect(() => {
+      if (inputAmount !== undefined) {
+        setAmount(inputAmount);
+      }
+    }, [inputAmount]);
+    
     React.useEffect(() => {
         const investmentAmount = parseInt(amount, 10);
         if (isNaN(investmentAmount) || investmentAmount < plan.minInvestment || investmentAmount > plan.maxInvestment) {
@@ -197,7 +206,7 @@ const ProfitCalculator: React.FC<{ plan: Plan }> = ({ plan }) => {
 };
 
 interface InvestmentPlansProps {
-  onSubmissionSuccess: (phoneNumber: string) => void;
+  onSubmissionSuccess?: (phoneNumber: string) => void; 
 }
 
 export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
@@ -216,8 +225,8 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
 
   const handleInvestClick = (plan: Plan) => {
     setSelectedPlan(plan);
-    setInvestmentAmount(plan.minInvestment.toString());
-    setUserName(''); // Reset fields for new submission
+    setInvestmentAmount(plan.minInvestment.toString()); // Default to min investment
+    setUserName(''); 
     setUserPhoneNumber('');
     setAmountError(null);
     setTransactionProof(null);
@@ -244,7 +253,7 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
                  setAmountError(null);
              }
         } else {
-            setAmountError(null);
+            setAmountError(null); // Clear error if input is empty
         }
      }
    };
@@ -279,41 +288,52 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
         toast({ variant: "destructive", title: "Name Required", description: "Please enter your name." });
         return;
     }
-    if (!userPhoneNumber.trim() || !/^\d{10,15}$/.test(userPhoneNumber.trim())) {
+    if (!userPhoneNumber.trim() || !/^\d{10,15}$/.test(userPhoneNumber.trim())) { // Basic phone validation
         toast({ variant: "destructive", title: "Invalid Phone Number", description: "Please enter a valid phone number (10-15 digits)." });
         return;
     }
 
      const finalAmount = parseInt(investmentAmount, 10);
       if (isNaN(finalAmount) || finalAmount < selectedPlan.minInvestment || finalAmount > selectedPlan.maxInvestment) {
-         setAmountError(`Amount must be between ${formatCurrency(selectedPlan.minInvestment)} and ${formatCurrency(selectedPlan.maxInvestment)}.`);
-         toast({ variant: "destructive", title: "Invalid Amount", description: amountError });
+         const errMessage = `Amount must be between ${formatCurrency(selectedPlan.minInvestment)} and ${formatCurrency(selectedPlan.maxInvestment)}.`;
+         setAmountError(errMessage);
+         toast({ variant: "destructive", title: "Invalid Amount", description: errMessage });
          return;
      } else {
          setAmountError(null);
      }
+
     if (!transactionProofDataUrl) {
       toast({ variant: "destructive", title: "Upload Required", description: "Please select and upload your transaction proof screenshot." });
       return;
     }
-     if (amountError) {
+     if (amountError) { // Double check amountError state
        toast({ variant: "destructive", title: "Invalid Amount", description: amountError });
        return;
      }
 
     setIsSubmitting(true);
     try {
-        const submissionData = {
-            ...selectedPlan, 
-            investmentAmount: finalAmount,
-            userId: userPhoneNumber, // Use phone number as userId
+        const submissionData: InvestmentSubmission = {
+            // Omit 'icon' and 'investmentRange' from selectedPlan for storage if they are not part of InvestmentSubmission
+            // Assuming InvestmentSubmission has all other relevant fields from Plan
+            id: selectedPlan.id, // Use plan id
+            title: selectedPlan.title,
+            iconName: selectedPlan.iconName, // Use stored icon name
+            duration: selectedPlan.duration,
+            dailyProfitMin: selectedPlan.dailyProfitMin,
+            dailyProfitMax: selectedPlan.dailyProfitMax,
+            minInvestment: selectedPlan.minInvestment,
+            maxInvestment: selectedPlan.maxInvestment,
+            investmentAmount: finalAmount, // This is the user-entered amount
+            userId: userPhoneNumber, 
             userName: userName,
             transactionProofDataUrl: transactionProofDataUrl,
             submissionDate: new Date().toISOString(),
             status: 'pending' as const,
-            icon: selectedPlan.icon, 
+            referralBonusPercent: 0, // Default to 0 for now
         };
-        // @ts-ignore - addPendingInvestment expects icon as ElementType which selectedPlan.icon is
+        
         await addPendingInvestment(submissionData);
         toast({
             title: "Proof Submitted Successfully",
@@ -321,7 +341,7 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
             variant: 'default',
         });
         setIsModalOpen(false);
-        onSubmissionSuccess?.(userPhoneNumber); // Call the callback with the phone number
+        onSubmissionSuccess?.(userPhoneNumber); 
     } catch (error) {
          console.error("Submission error:", error);
         toast({ variant: "destructive", title: "Submission Failed", description: "There was an error submitting your proof. Please try again." });
@@ -343,6 +363,7 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
     <>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
+          const PlanIconComponent = plan.icon;
           const dailyProfitText = plan.dailyProfitMin === plan.dailyProfitMax
             ? `${plan.dailyProfitMin.toFixed(1)}%`
             : `${plan.dailyProfitMin.toFixed(1)}% – ${plan.dailyProfitMax.toFixed(1)}%`;
@@ -356,12 +377,12 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
            const displayInvestment = plan.investmentRange;
 
           return (
-            <Card key={plan.title} className={`flex flex-col ${plan.primary ? 'border-primary ring-2 ring-primary shadow-lg' : ''}`}>
+            <Card key={plan.id} className={`flex flex-col ${plan.primary ? 'border-primary ring-2 ring-primary shadow-lg' : ''}`}>
               <CardHeader className="items-center pb-4 relative">
                 {plan.badge && (
                   <Badge variant={plan.primary ? "default" : "secondary"} className="absolute -top-3 right-3">{plan.badge}</Badge>
                 )}
-                <plan.icon className={`h-10 w-10 mb-2 ${plan.primary ? 'text-primary' : 'text-accent'}`} />
+                <PlanIconComponent className={`h-10 w-10 mb-2 ${plan.primary ? 'text-primary' : 'text-accent'}`} />
                 <CardTitle className="text-xl">{plan.title}</CardTitle>
                  <CardDescription className="text-center">Invest {displayInvestment}</CardDescription>
               </CardHeader>
@@ -386,7 +407,7 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
                   variant={plan.primary ? "default" : "outline"}
                   onClick={() => handleInvestClick(plan)}
                 >
-                   Invest Now
+                   Invest
                 </Button>
               </CardFooter>
             </Card>
@@ -445,7 +466,7 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
                        inputMode="numeric"
                        value={investmentAmount}
                        onChange={handleAmountChange}
-                       placeholder={`e.g., ${selectedPlan.minInvestment}`}
+                       placeholder={`e.g., ${formatCurrency(selectedPlan.minInvestment)}`}
                        className={amountError ? 'border-destructive' : ''}
                        required
                    />
@@ -465,7 +486,7 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
                             <p>Account Name: <span className="font-medium">{paymentDetails.easypaisa.accountName}</span></p>
                             <div className="flex items-center gap-2">
                                 <p>Account Number: <span className="font-mono">{paymentDetails.easypaisa.accountNumber}</span></p>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(paymentDetails.easypaisa.accountNumber, 'Easypaisa Number')}>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(paymentDetails.easypaisa.accountNumber, 'Easypaisa Number')}>
                                     <Copy className="h-3 w-3" />
                                      <span className="sr-only">Copy Easypaisa Number</span>
                                 </Button>
@@ -481,7 +502,7 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
                            <p>Account Name: <span className="font-medium">{paymentDetails.jazzcash.accountName}</span></p>
                             <div className="flex items-center gap-2">
                                 <p>Account Number: <span className="font-mono">{paymentDetails.jazzcash.accountNumber}</span></p>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(paymentDetails.jazzcash.accountNumber, 'JazzCash Number')}>
+                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(paymentDetails.jazzcash.accountNumber, 'JazzCash Number')}>
                                     <Copy className="h-3 w-3" />
                                     <span className="sr-only">Copy JazzCash Number</span>
                                 </Button>
@@ -490,58 +511,64 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
                    </Card>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="transaction-proof" className="text-base font-semibold flex items-center gap-2">
+                    <Label htmlFor="transaction-proof-hidden" className="text-base font-semibold flex items-center gap-2">
                         <UploadCloud className="h-5 w-5" /> Upload Transaction Screenshot
                     </Label>
-                    <div className="flex items-center space-x-2">
-                        <Input
-                            id="transaction-proof"
-                            type="file"
-                            ref={fileInputRef}
-                            accept="image/png, image/jpeg, image/jpg"
-                            onChange={handleFileChange}
-                            className={`flex-grow file:border-0 file:bg-primary file:text-primary-foreground file:hover:bg-primary/90 file:mr-4 file:py-2 file:px-4 file:rounded-md file:text-sm file:font-semibold cursor-pointer ${
-                                transactionProof ? 'hidden' : ''
-                            }`}
-                            required
-                            aria-describedby="file-help-text"
-                        />
-                         {transactionProof && (
-                            <div className="flex items-center justify-between flex-grow rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
-                                <span className="truncate flex-grow mr-2">{transactionProof.name}</span>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-destructive hover:bg-destructive/10"
-                                    onClick={() => {
-                                        setTransactionProof(null);
-                                        setTransactionProofDataUrl(null);
-                                        if (fileInputRef.current) fileInputRef.current.value = "";
-                                    }}
-                                    title="Remove file"
-                                >
-                                    <X className="h-4 w-4" />
-                                    <span className="sr-only">Remove file</span>
-                                </Button>
-                            </div>
-                        )}
-                    </div>
+                    <Input
+                        id="transaction-proof-hidden"
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/png, image/jpeg, image/jpg"
+                        onChange={handleFileChange}
+                        className="hidden"
+                        aria-describedby="file-help-text"
+                    />
+                    {!transactionProof ? (
+                        <Button
+                            type="button" 
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <UploadCloud className="mr-2 h-4 w-4" />
+                            Select Screenshot File
+                        </Button>
+                    ) : (
+                        <div className="flex items-center justify-between w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                            <span className="truncate flex-grow mr-2">{transactionProof.name}</span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive hover:bg-destructive/10"
+                                onClick={() => {
+                                    setTransactionProof(null);
+                                    setTransactionProofDataUrl(null);
+                                    if (fileInputRef.current) fileInputRef.current.value = "";
+                                }}
+                                title="Remove file"
+                            >
+                                <X className="h-4 w-4" />
+                                <span className="sr-only">Remove file</span>
+                            </Button>
+                        </div>
+                    )}
                     {!transactionProof && (
-                        <p id="file-help-text" className="text-xs text-muted-foreground">
+                        <p id="file-help-text" className="text-xs text-muted-foreground mt-1">
                              Please select a clear screenshot of your successful transaction (max 5MB, JPG/PNG).
                          </p>
                     )}
-                      {transactionProof && (
+                    {transactionProof && (
                         <div className="flex items-center text-xs text-green-600 dark:text-green-400 mt-1">
                             <CheckCircle className="h-4 w-4 mr-1" />
-                            Screenshot selected. Click Submit below.
+                            Screenshot selected. You can now submit below.
                         </div>
                      )}
                 </div>
               </div>
               <DialogFooter>
                  <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
+                    <Button variant="outline" type="button">Cancel</Button>
                  </DialogClose>
                 <Button
                   type="button"
@@ -563,3 +590,5 @@ export function InvestmentPlans({ onSubmissionSuccess }: InvestmentPlansProps) {
     </>
   );
 }
+
+    
