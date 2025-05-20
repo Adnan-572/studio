@@ -8,12 +8,12 @@ import {
   approveInvestment,
   rejectInvestment,
   getAllApprovedInvestments,
-  type InvestmentSubmission,
+  type InvestmentSubmissionFirestore, // Updated type
 } from '@/lib/investment-store';
 import {
   getPendingWithdrawalRequests,
   updateWithdrawalStatus,    
-  type WithdrawalRequest,
+  type WithdrawalRequestFirestore, // Updated type
 } from '@/lib/withdrawal-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,16 +48,16 @@ const formatCurrency = (amount: number): string => {
 export default function DeveloperDashboardPage() {
   const router = useRouter();
 
-  const [pendingInvestments, setPendingInvestments] = React.useState<InvestmentSubmission[]>([]);
-  const [activeInvestments, setActiveInvestments] = React.useState<InvestmentSubmission[]>([]);
-  const [pendingWithdrawals, setPendingWithdrawals] = React.useState<WithdrawalRequest[]>([]);
+  const [pendingInvestments, setPendingInvestments] = React.useState<InvestmentSubmissionFirestore[]>([]);
+  const [activeInvestments, setActiveInvestments] = React.useState<InvestmentSubmissionFirestore[]>([]);
+  const [pendingWithdrawals, setPendingWithdrawals] = React.useState<WithdrawalRequestFirestore[]>([]);
   const [isLoadingInvestments, setIsLoadingInvestments] = React.useState(true);
   const [isLoadingActive, setIsLoadingActive] = React.useState(true);
   const [isLoadingWithdrawals, setIsLoadingWithdrawals] = React.useState(true);
   const [isProcessingInvestment, setIsProcessingInvestment] = React.useState<Record<string, boolean>>({});
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = React.useState<Record<string, boolean>>({});
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
-  const [withdrawalAction, setWithdrawalAction] = React.useState<{ type: 'complete' | 'reject', request: WithdrawalRequest | null }>({ type: 'complete', request: null });
+  const [withdrawalAction, setWithdrawalAction] = React.useState<{ type: 'complete' | 'reject', request: WithdrawalRequestFirestore | null }>({ type: 'complete', request: null });
   const [transactionId, setTransactionId] = React.useState('');
   const [rejectionReason, setRejectionReason] = React.useState('');
 
@@ -65,33 +65,37 @@ export default function DeveloperDashboardPage() {
 
   const fetchAllData = React.useCallback(() => {
     setIsLoadingInvestments(true);
-    const pending = getAllPendingInvestments();
+    // TODO: Replace with actual Firestore call
+    const pending = getAllPendingInvestments(); 
     setPendingInvestments(pending);
     setIsLoadingInvestments(false);
 
     setIsLoadingActive(true);
-    const active = getAllApprovedInvestments();
+    // TODO: Replace with actual Firestore call
+    const active = getAllApprovedInvestments(); 
     setActiveInvestments(active);
     setIsLoadingActive(false);
 
     setIsLoadingWithdrawals(true);
-    const pendingW = getPendingWithdrawalRequests();
+    // TODO: Replace with actual Firestore call
+    const pendingW = getPendingWithdrawalRequests(); 
     setPendingWithdrawals(pendingW);
     setIsLoadingWithdrawals(false);
   }, []);
 
   React.useEffect(() => {
     fetchAllData();
-    const interval = setInterval(fetchAllData, 15000);
-    return () => clearInterval(interval);
+    // No interval refresh for now as data is static placeholders
+    // const interval = setInterval(fetchAllData, 15000); 
+    // return () => clearInterval(interval);
   }, [fetchAllData]);
 
 
   const handleApproveInvestment = async (submissionId: string) => {
     setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: true }));
     try {
-      await approveInvestment(submissionId);
-      toast({ title: 'Investment Approved', description: `Investment ID ${submissionId} has been approved.` });
+      await approveInvestment(submissionId); // Placeholder
+      toast({ title: 'Investment Approved (Placeholder)', description: `Investment ID ${submissionId} marked as approved.` });
       fetchAllData();
     } catch (error) {
       console.error('Approval error:', error);
@@ -104,8 +108,8 @@ export default function DeveloperDashboardPage() {
   const handleRejectInvestment = async (submissionId: string) => {
     setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: true }));
     try {
-      await rejectInvestment(submissionId);
-      toast({ title: 'Investment Rejected', description: `Investment ID ${submissionId} has been rejected.`, variant: 'destructive' });
+      await rejectInvestment(submissionId); // Placeholder
+      toast({ title: 'Investment Rejected (Placeholder)', description: `Investment ID ${submissionId} marked as rejected.`, variant: 'destructive' });
       fetchAllData();
     } catch (error) {
       console.error('Rejection error:', error);
@@ -115,7 +119,7 @@ export default function DeveloperDashboardPage() {
     }
   };
 
-  const openWithdrawalActionModal = (type: 'complete' | 'reject', request: WithdrawalRequest) => {
+  const openWithdrawalActionModal = (type: 'complete' | 'reject', request: WithdrawalRequestFirestore) => {
       setWithdrawalAction({ type, request });
       setTransactionId(''); 
       setRejectionReason('');
@@ -130,11 +134,11 @@ export default function DeveloperDashboardPage() {
           toast({ title: "Missing Transaction ID", description: "Please enter the payment transaction ID.", variant: "destructive" });
           return;
       }
-      const requestId = withdrawalAction.request.id;
+      const requestId = withdrawalAction.request.id!;
       setIsProcessingWithdrawal((prev) => ({ ...prev, [requestId]: true }));
       try {
-          await updateWithdrawalStatus(requestId, 'completed', { transactionId: transactionId.trim() });
-          toast({ title: 'Withdrawal Completed', description: `Withdrawal ${requestId} marked as completed.` });
+          await updateWithdrawalStatus(requestId, 'completed', { transactionId: transactionId.trim() }); // Placeholder
+          toast({ title: 'Withdrawal Completed (Placeholder)', description: `Withdrawal ${requestId} marked as completed.` });
           fetchAllData();
           closeWithdrawalActionModal();
       } catch (error) {
@@ -150,11 +154,11 @@ export default function DeveloperDashboardPage() {
            toast({ title: "Missing Rejection Reason", description: "Please provide a reason for rejection.", variant: "destructive" });
            return;
        }
-       const requestId = withdrawalAction.request.id;
+       const requestId = withdrawalAction.request.id!;
        setIsProcessingWithdrawal((prev) => ({ ...prev, [requestId]: true }));
        try {
-           await updateWithdrawalStatus(requestId, 'rejected', { rejectionReason: rejectionReason.trim() });
-           toast({ title: 'Withdrawal Rejected', description: `Withdrawal ${requestId} has been rejected.`, variant: 'destructive' });
+           await updateWithdrawalStatus(requestId, 'rejected', { rejectionReason: rejectionReason.trim() }); // Placeholder
+           toast({ title: 'Withdrawal Rejected (Placeholder)', description: `Withdrawal ${requestId} has been rejected.`, variant: 'destructive' });
            fetchAllData();
            closeWithdrawalActionModal();
        } catch (error) {
@@ -185,7 +189,7 @@ export default function DeveloperDashboardPage() {
               <Card>
                   <CardHeader>
                       <CardTitle>Review Investment Submissions</CardTitle>
-                      <CardDescription>Approve or reject pending investment proofs.</CardDescription>
+                      <CardDescription>Approve or reject pending investment proofs. (Currently using placeholder data)</CardDescription>
                   </CardHeader>
                   <CardContent>
                       {isLoadingInvestments ? (
@@ -211,17 +215,18 @@ export default function DeveloperDashboardPage() {
                                       <TableRow key={submission.id}>
                                           <TableCell>
                                               <div>{submission.userName}</div>
-                                              <div className="text-xs text-muted-foreground">{submission.userId}</div> {/* userId is phone number */}
+                                              {/* Use userPhoneNumber for display, as userId is Firebase UID */}
+                                              <div className="text-xs text-muted-foreground">{submission.userPhoneNumber}</div> 
                                           </TableCell>
                                           <TableCell>{submission.title}</TableCell>
                                           <TableCell className="text-right font-medium">{formatCurrency(submission.investmentAmount)}</TableCell>
                                           <TableCell>{format(new Date(submission.submissionDate), 'Pp')}</TableCell>
                                           <TableCell className="text-center">
-                                              {submission.transactionProofDataUrl ? (
+                                              {submission.transactionProofUrl ? ( // Use transactionProofUrl
                                                   <Button
                                                       variant="outline"
                                                       size="sm"
-                                                      onClick={() => openImageModal(submission.transactionProofDataUrl!)}
+                                                      onClick={() => openImageModal(submission.transactionProofUrl!)}
                                                   >
                                                       <ExternalLink className="mr-1 h-4 w-4" /> View
                                                   </Button>
@@ -270,7 +275,7 @@ export default function DeveloperDashboardPage() {
               <Card>
                   <CardHeader>
                       <CardTitle>Active Investments</CardTitle>
-                      <CardDescription>Overview of all currently active investments.</CardDescription>
+                      <CardDescription>Overview of all currently active investments. (Currently using placeholder data)</CardDescription>
                   </CardHeader>
                   <CardContent>
                       {isLoadingActive ? (
@@ -293,7 +298,7 @@ export default function DeveloperDashboardPage() {
                               </TableHeader>
                               <TableBody>
                                   {activeInvestments.map((investment) => {
-                                      const startDate = new Date(investment.approvalDate!);
+                                      const startDate = investment.approvalDate ? new Date(investment.approvalDate) : new Date(); // Handle null approvalDate
                                       const endDate = addDays(startDate, investment.duration);
                                       const isComplete = isPast(endDate);
 
@@ -301,11 +306,11 @@ export default function DeveloperDashboardPage() {
                                           <TableRow key={investment.id}>
                                               <TableCell>
                                                   <div>{investment.userName}</div>
-                                                  <div className="text-xs text-muted-foreground">{investment.userId}</div>
+                                                  <div className="text-xs text-muted-foreground">{investment.userPhoneNumber}</div>
                                               </TableCell>
                                               <TableCell>{investment.title}</TableCell>
                                               <TableCell className="text-right font-medium">{formatCurrency(investment.investmentAmount)}</TableCell>
-                                              <TableCell>{format(startDate, 'Pp')}</TableCell>
+                                              <TableCell>{investment.approvalDate ? format(startDate, 'Pp') : "N/A"}</TableCell>
                                               <TableCell>{format(endDate, 'Pp')}</TableCell>
                                               <TableCell>
                                                   <Badge variant={isComplete ? "secondary" : "default"}>
@@ -326,7 +331,7 @@ export default function DeveloperDashboardPage() {
                <Card>
                   <CardHeader>
                       <CardTitle>Review Withdrawal Requests</CardTitle>
-                      <CardDescription>Mark pending withdrawal requests as completed or rejected.</CardDescription>
+                      <CardDescription>Mark pending withdrawal requests as completed or rejected. (Currently using placeholder data)</CardDescription>
                   </CardHeader>
                   <CardContent>
                       {isLoadingWithdrawals ? (
@@ -353,7 +358,7 @@ export default function DeveloperDashboardPage() {
                                       <TableRow key={request.id}>
                                           <TableCell>
                                               <div>{request.userName}</div>
-                                              <div className="text-xs text-muted-foreground">{request.userId}</div>
+                                              <div className="text-xs text-muted-foreground">{request.userPhoneNumber}</div>
                                           </TableCell>
                                           <TableCell>
                                                 <div>{request.investmentTitle}</div>
