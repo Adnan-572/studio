@@ -10,9 +10,8 @@ import { useRouter } from 'next/navigation';
 import { InvestmentPlans } from '@/components/investment-plans';
 import { Dashboard as UserInvestmentDashboard } from '@/components/dashboard'; // Renamed import
 import { getActiveInvestmentsForUserFromFirestore, type InvestmentSubmissionFirestore } from '@/lib/investment-store';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle, PlusCircle } from 'lucide-react'; // Added AlertTriangle
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PlusCircle } from 'lucide-react';
 
 export default function DashboardPage() {
   const { currentUser, logoutUser } = useAuth();
