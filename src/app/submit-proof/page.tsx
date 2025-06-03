@@ -31,7 +31,7 @@ const paymentDetails = {
   },
   sadapay: {
     accountName: "Rupay Growth",
-    accountNumber: "03121145736", 
+    accountNumber: "PK92SADA0000003121145736", 
     icon: "/payment-icons/sadapay.png", 
   },
 };
