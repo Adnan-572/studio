@@ -4,14 +4,10 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  getPendingInvestmentsFromFirestore, 
-  approveInvestmentInFirestore,       
-  rejectInvestmentInFirestore,        
-  getApprovedInvestmentsFromFirestore, 
-  // Add a function to get ALL investments for the user management tab
-  // For now, we'll combine pending and approved and then filter in component,
-  // but ideally, a dedicated function or more comprehensive fetch would be better.
-  type InvestmentSubmissionFirestore, 
+  getAllSubmittedPlansForAdmin, // New: Fetches all plans from all users' subcollections
+  approveSubmittedPlan,       // New: Approves a plan in a user's subcollection
+  rejectSubmittedPlan,        // New: Rejects a plan in a user's subcollection
+  type UserPlanData,          // New: The type for plan documents in subcollections
 } from '@/lib/investment-store';
 import {
   getPendingWithdrawalRequestsFromFirestore, 
@@ -64,7 +60,7 @@ const formatFirestoreTimestamp = (timestamp: Timestamp | string | undefined | nu
   return includeTime ? format(date, 'Pp') : format(date, 'P');
 };
 
-interface UserSummary {
+interface UserSummaryForAdmin {
   userId: string;
   userName: string;
   userPhoneNumber: string;
@@ -74,20 +70,19 @@ interface UserSummary {
 export default function DeveloperDashboardPage() {
   const router = useRouter();
 
-  const [pendingInvestments, setPendingInvestments] = React.useState<InvestmentSubmissionFirestore[]>([]);
-  const [activeInvestments, setActiveInvestments] = React.useState<InvestmentSubmissionFirestore[]>([]);
-  const [allInvestments, setAllInvestments] = React.useState<InvestmentSubmissionFirestore[]>([]); // For User Management
-  const [uniqueUsers, setUniqueUsers] = React.useState<UserSummary[]>([]);
-  const [selectedUserInvestments, setSelectedUserInvestments] = React.useState<InvestmentSubmissionFirestore[]>([]);
-  const [selectedUserDetails, setSelectedUserDetails] = React.useState<UserSummary | null>(null);
-
+  const [allUserPlans, setAllUserPlans] = React.useState<UserPlanData[]>([]); // Holds all plans from all users
+  const [pendingInvestments, setPendingInvestments] = React.useState<UserPlanData[]>([]);
+  const [activeCompletedInvestments, setActiveCompletedInvestments] = React.useState<UserPlanData[]>([]);
+  
+  const [uniqueUsers, setUniqueUsers] = React.useState<UserSummaryForAdmin[]>([]);
+  const [selectedUserInvestments, setSelectedUserInvestments] = React.useState<UserPlanData[]>([]);
+  const [selectedUserDetails, setSelectedUserDetails] = React.useState<UserSummaryForAdmin | null>(null);
 
   const [pendingWithdrawals, setPendingWithdrawals] = React.useState<WithdrawalRequestFirestore[]>([]);
-  const [isLoadingInvestments, setIsLoadingInvestments] = React.useState(true);
-  const [isLoadingActive, setIsLoadingActive] = React.useState(true);
-  const [isLoadingAllInvestments, setIsLoadingAllInvestments] = React.useState(true); // Loading for user management
+  const [isLoadingAllPlans, setIsLoadingAllPlans] = React.useState(true);
   const [isLoadingWithdrawals, setIsLoadingWithdrawals] = React.useState(true);
-  const [isProcessingInvestment, setIsProcessingInvestment] = React.useState<Record<string, boolean>>({});
+
+  const [isProcessingInvestment, setIsProcessingInvestment] = React.useState<Record<string, boolean>>({}); // Key will be plan.id
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = React.useState<Record<string, boolean>>({});
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
   
@@ -97,51 +92,37 @@ export default function DeveloperDashboardPage() {
   
   const [investmentRejectionReason, setInvestmentRejectionReason] = React.useState('');
   const [isRejectionModalOpen, setIsRejectionModalOpen] = React.useState(false);
-  const [currentInvestmentToReject, setCurrentInvestmentToReject] = React.useState<string | null>(null);
+  const [currentPlanToReject, setCurrentPlanToReject] = React.useState<UserPlanData | null>(null);
 
   const { toast } = useToast();
 
   const fetchAllData = React.useCallback(async () => {
-    setIsLoadingInvestments(true);
-    setIsLoadingActive(true);
+    setIsLoadingAllPlans(true);
     setIsLoadingWithdrawals(true);
-    setIsLoadingAllInvestments(true);
 
     try {
-      const [pending, active, pendingW] = await Promise.all([
-        getPendingInvestmentsFromFirestore(),
-        getApprovedInvestmentsFromFirestore(), // This fetches 'approved' and 'completed'
+      const [allPlansFromDb, pendingW] = await Promise.all([
+        getAllSubmittedPlansForAdmin(),
         getPendingWithdrawalRequestsFromFirestore()
       ]);
       
-      setPendingInvestments(pending);
-      setActiveInvestments(active); // Contains approved and completed
+      setAllUserPlans(allPlansFromDb);
+      setPendingInvestments(allPlansFromDb.filter(p => p.status === 'pending'));
+      setActiveCompletedInvestments(allPlansFromDb.filter(p => p.status === 'approved' || p.status === 'completed'));
       setPendingWithdrawals(pendingW);
 
-      // For User Management Tab: Combine all known investments
-      // To get a truly full list including 'rejected', we might need another query or adjust getApproved.
-      // For now, using pending + active (which includes completed).
-      // A more robust way would be a single query in investment-store.ts: getAllInvestments()
-      const combinedInvestments = [...pending, ...active];
-      // Let's simulate fetching all investments (including rejected) by combining what we have.
-      // In a real scenario, you would add a function like `getRejectedInvestmentsFromFirestore()`
-      // or ideally `getAllInvestmentsFromFirestore()`.
-      // For demonstration, we'll assume `active` might also contain rejected ones if `getApprovedInvestmentsFromFirestore` was broader
-      // or we could filter unique items if `pending` and `active` could overlap.
-      // For now, `combinedInvestments` will be used.
-      setAllInvestments(combinedInvestments);
-
-      const usersMap = new Map<string, UserSummary>();
-      combinedInvestments.forEach(inv => {
-        if (!usersMap.has(inv.userId)) {
-          usersMap.set(inv.userId, {
-            userId: inv.userId,
-            userName: inv.userName,
-            userPhoneNumber: inv.userPhoneNumber,
+      // User Management Tab Data
+      const usersMap = new Map<string, UserSummaryForAdmin>();
+      allPlansFromDb.forEach(plan => {
+        if (!usersMap.has(plan.userId)) {
+          usersMap.set(plan.userId, {
+            userId: plan.userId,
+            userName: plan.userName, // Assumes userName is denormalized in UserPlanData
+            userPhoneNumber: plan.userPhoneNumber, // Assumes userPhoneNumber is denormalized
             investmentCount: 0,
           });
         }
-        usersMap.get(inv.userId)!.investmentCount++;
+        usersMap.get(plan.userId)!.investmentCount++;
       });
       setUniqueUsers(Array.from(usersMap.values()));
       
@@ -149,10 +130,8 @@ export default function DeveloperDashboardPage() {
       console.error("Error fetching dashboard data:", err);
       toast({ title: 'Error Fetching Data', description: 'Could not load all dashboard data.', variant: 'destructive' });
     } finally {
-      setIsLoadingInvestments(false);
-      setIsLoadingActive(false);
+      setIsLoadingAllPlans(false);
       setIsLoadingWithdrawals(false);
-      setIsLoadingAllInvestments(false);
     }
   }, [toast]);
 
@@ -162,55 +141,55 @@ export default function DeveloperDashboardPage() {
     return () => clearInterval(interval);
   }, [fetchAllData]);
 
-  const handleViewUserInvestments = (user: UserSummary) => {
+  const handleViewUserInvestments = (user: UserSummaryForAdmin) => {
     setSelectedUserDetails(user);
-    const userInvests = allInvestments.filter(inv => inv.userId === user.userId);
+    const userInvests = allUserPlans.filter(inv => inv.userId === user.userId);
     setSelectedUserInvestments(userInvests.sort((a, b) => (b.submissionDate?.toDate()?.getTime() || 0) - (a.submissionDate?.toDate()?.getTime() || 0)));
   };
 
-
-  const handleApproveInvestment = async (submissionId: string) => {
-    if (!submissionId) return;
-    setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: true }));
+  const handleApproveInvestment = async (planToApprove: UserPlanData) => {
+    if (!planToApprove || !planToApprove.id || !planToApprove.userId) return;
+    setIsProcessingInvestment((prev) => ({ ...prev, [planToApprove.id!]: true }));
     try {
-      await approveInvestmentInFirestore(submissionId);
-      toast({ title: 'Investment Approved', description: `Investment ID ${submissionId} marked as approved.` });
+      await approveSubmittedPlan(planToApprove.userId, planToApprove.id!);
+      toast({ title: 'Investment Approved', description: `Investment ID ${planToApprove.id} for user ${planToApprove.userName} marked as approved.` });
       fetchAllData(); 
     } catch (error) {
       console.error('Approval error:', error);
-      toast({ title: 'Approval Failed', description: `Could not approve investment ${submissionId}.`, variant: 'destructive' });
+      toast({ title: 'Approval Failed', description: `Could not approve investment ${planToApprove.id}.`, variant: 'destructive' });
     } finally {
-      setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: false }));
+      setIsProcessingInvestment((prev) => ({ ...prev, [planToApprove.id!]: false }));
     }
   };
   
-  const openRejectInvestmentModal = (submissionId: string) => {
-    setCurrentInvestmentToReject(submissionId);
+  const openRejectInvestmentModal = (planToReject: UserPlanData) => {
+    setCurrentPlanToReject(planToReject);
     setInvestmentRejectionReason('');
     setIsRejectionModalOpen(true);
   };
 
   const handleConfirmRejectInvestment = async () => {
-    if (!currentInvestmentToReject || !investmentRejectionReason.trim()) {
+    if (!currentPlanToReject || !currentPlanToReject.id || !currentPlanToReject.userId || !investmentRejectionReason.trim()) {
        toast({ title: "Missing Reason", description: "Please provide a reason for rejection.", variant: "destructive" });
        return;
     }
-    const submissionId = currentInvestmentToReject;
-    setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: true }));
+    const planId = currentPlanToReject.id!;
+    const userId = currentPlanToReject.userId;
+
+    setIsProcessingInvestment((prev) => ({ ...prev, [planId]: true }));
     try {
-      await rejectInvestmentInFirestore(submissionId, investmentRejectionReason.trim());
-      toast({ title: 'Investment Rejected', description: `Investment ID ${submissionId} marked as rejected.`, variant: 'destructive' });
+      await rejectSubmittedPlan(userId, planId, investmentRejectionReason.trim());
+      toast({ title: 'Investment Rejected', description: `Investment ID ${planId} marked as rejected.`, variant: 'destructive' });
       fetchAllData(); 
       setIsRejectionModalOpen(false);
-      setCurrentInvestmentToReject(null);
+      setCurrentPlanToReject(null);
     } catch (error) {
       console.error('Rejection error:', error);
-      toast({ title: 'Rejection Failed', description: `Could not reject investment ${submissionId}.`, variant: 'destructive' });
+      toast({ title: 'Rejection Failed', description: `Could not reject investment ${planId}.`, variant: 'destructive' });
     } finally {
-      setIsProcessingInvestment((prev) => ({ ...prev, [submissionId]: false }));
+      setIsProcessingInvestment((prev) => ({ ...prev, [planId]: false }));
     }
   };
-
 
   const openWithdrawalActionModal = (type: 'complete' | 'reject', request: WithdrawalRequestFirestore) => {
       setWithdrawalAction({ type, request });
@@ -274,11 +253,12 @@ export default function DeveloperDashboardPage() {
       <Tabs defaultValue="pending-investments" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6">
               <TabsTrigger value="pending-investments">Pending Investments ({pendingInvestments.length})</TabsTrigger>
-              <TabsTrigger value="active-investments">Active/Completed ({activeInvestments.length})</TabsTrigger>
+              <TabsTrigger value="active-investments">Active/Completed ({activeCompletedInvestments.length})</TabsTrigger>
               <TabsTrigger value="pending-withdrawals">Pending Withdrawals ({pendingWithdrawals.length})</TabsTrigger>
               <TabsTrigger value="user-management">User Management ({uniqueUsers.length})</TabsTrigger>
           </TabsList>
 
+          {/* Pending Investments Tab */}
           <TabsContent value="pending-investments">
               <Card>
                   <CardHeader>
@@ -286,7 +266,7 @@ export default function DeveloperDashboardPage() {
                       <CardDescription>Approve or reject pending investment proofs.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                      {isLoadingInvestments ? (
+                      {isLoadingAllPlans ? (
                           <div className="flex justify-center items-center min-h-[200px]">
                               <Loader2 className="h-12 w-12 animate-spin text-primary" />
                           </div>
@@ -305,21 +285,21 @@ export default function DeveloperDashboardPage() {
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
-                                  {pendingInvestments.map((submission) => (
-                                      <TableRow key={submission.id}>
+                                  {pendingInvestments.map((plan) => (
+                                      <TableRow key={plan.id}>
                                           <TableCell>
-                                              <div>{submission.userName}</div>
-                                              <div className="text-xs text-muted-foreground">{submission.userPhoneNumber}</div> 
+                                              <div>{plan.userName}</div>
+                                              <div className="text-xs text-muted-foreground">{plan.userPhoneNumber}</div> 
                                           </TableCell>
-                                          <TableCell>{submission.planTitle}</TableCell>
-                                          <TableCell className="text-right font-medium">{formatCurrency(submission.investmentAmount)}</TableCell>
-                                          <TableCell>{formatFirestoreTimestamp(submission.submissionDate)}</TableCell>
+                                          <TableCell>{plan.planTitle}</TableCell>
+                                          <TableCell className="text-right font-medium">{formatCurrency(plan.investmentAmount)}</TableCell>
+                                          <TableCell>{formatFirestoreTimestamp(plan.submissionDate)}</TableCell>
                                           <TableCell className="text-center">
-                                              {submission.transactionProofUrl ? (
+                                              {plan.transactionProofUrl ? (
                                                   <Button
                                                       variant="outline"
                                                       size="sm"
-                                                      onClick={() => openImageModal(submission.transactionProofUrl)}
+                                                      onClick={() => openImageModal(plan.transactionProofUrl)}
                                                   >
                                                       <ExternalLink className="mr-1 h-4 w-4" /> View
                                                   </Button>
@@ -331,10 +311,10 @@ export default function DeveloperDashboardPage() {
                                               <Button
                                                   variant="default"
                                                   size="sm"
-                                                  onClick={() => handleApproveInvestment(submission.id!)}
-                                                  disabled={isProcessingInvestment[submission.id!]}
+                                                  onClick={() => handleApproveInvestment(plan)}
+                                                  disabled={isProcessingInvestment[plan.id!]}
                                               >
-                                                  {isProcessingInvestment[submission.id!] ? (
+                                                  {isProcessingInvestment[plan.id!] ? (
                                                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                                                   ) : (
                                                       <CheckCircle className="mr-1 h-4 w-4" />
@@ -344,10 +324,10 @@ export default function DeveloperDashboardPage() {
                                               <Button
                                                   variant="destructive"
                                                   size="sm"
-                                                  onClick={() => openRejectInvestmentModal(submission.id!)}
-                                                  disabled={isProcessingInvestment[submission.id!]}
+                                                  onClick={() => openRejectInvestmentModal(plan)}
+                                                  disabled={isProcessingInvestment[plan.id!]}
                                               >
-                                                  {isProcessingInvestment[submission.id!] ? (
+                                                  {isProcessingInvestment[plan.id!] ? (
                                                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                                                   ) : (
                                                       <XCircle className="mr-1 h-4 w-4" />
@@ -364,6 +344,7 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
+          {/* Active/Completed Investments Tab */}
           <TabsContent value="active-investments">
               <Card>
                   <CardHeader>
@@ -371,11 +352,11 @@ export default function DeveloperDashboardPage() {
                       <CardDescription>Overview of all approved or completed investments.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                      {isLoadingActive ? (
+                      {isLoadingAllPlans ? (
                           <div className="flex justify-center items-center min-h-[200px]">
                               <Loader2 className="h-12 w-12 animate-spin text-primary" />
                           </div>
-                      ) : activeInvestments.length === 0 ? (
+                      ) : activeCompletedInvestments.length === 0 ? (
                           <p className="text-center text-muted-foreground mt-6">No active or completed investments found.</p>
                       ) : (
                           <Table>
@@ -391,37 +372,37 @@ export default function DeveloperDashboardPage() {
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
-                                  {activeInvestments.map((investment) => {
-                                      const startDate = investment.approvalDate ? (investment.approvalDate as Timestamp).toDate() : new Date();
-                                      const endDate = addDays(startDate, investment.duration);
-                                      const isPlanConsideredComplete = investment.status === 'completed' || (investment.status === 'approved' && isPast(endDate));
+                                  {activeCompletedInvestments.map((plan) => {
+                                      const startDate = plan.approvalDate ? (plan.approvalDate as Timestamp).toDate() : new Date(); // Fallback, though approvalDate should exist
+                                      const planEndDate = plan.endDate ? (plan.endDate as Timestamp).toDate() : addDays(startDate, plan.durationInDays);
+                                      const isPlanConsideredComplete = plan.status === 'completed' || (plan.status === 'approved' && isPast(planEndDate));
                                       
-                                      let displayStatus = investment.status.charAt(0).toUpperCase() + investment.status.slice(1);
-                                      if (investment.status === 'approved' && isPast(endDate) && investment.status !== 'completed') {
+                                      let displayStatus = plan.status.charAt(0).toUpperCase() + plan.status.slice(1);
+                                      if (plan.status === 'approved' && isPast(planEndDate) && plan.status !== 'completed') {
                                         displayStatus = "Ended (Awaiting Withdrawal)"; 
                                       }
 
                                       return (
-                                          <TableRow key={investment.id}>
+                                          <TableRow key={plan.id}>
                                               <TableCell>
-                                                  <div>{investment.userName}</div>
-                                                  <div className="text-xs text-muted-foreground">{investment.userPhoneNumber}</div>
+                                                  <div>{plan.userName}</div>
+                                                  <div className="text-xs text-muted-foreground">{plan.userPhoneNumber}</div>
                                               </TableCell>
-                                              <TableCell>{investment.planTitle}</TableCell>
-                                              <TableCell className="text-right font-medium">{formatCurrency(investment.investmentAmount)}</TableCell>
-                                              <TableCell>{formatFirestoreTimestamp(investment.approvalDate)}</TableCell>
-                                              <TableCell>{format(endDate, 'P')}</TableCell>
+                                              <TableCell>{plan.planTitle}</TableCell>
+                                              <TableCell className="text-right font-medium">{formatCurrency(plan.investmentAmount)}</TableCell>
+                                              <TableCell>{formatFirestoreTimestamp(plan.approvalDate)}</TableCell>
+                                              <TableCell>{formatFirestoreTimestamp(plan.endDate, false)}</TableCell>
                                               <TableCell>
-                                                  <Badge variant={isPlanConsideredComplete ? "secondary" : (investment.status === 'approved' ? "default" : (investment.status === 'rejected' ? "destructive" : "outline"))}>
+                                                  <Badge variant={isPlanConsideredComplete ? "secondary" : (plan.status === 'approved' ? "default" : (plan.status === 'rejected' ? "destructive" : "outline"))}>
                                                       {displayStatus}
                                                   </Badge>
                                               </TableCell>
                                                <TableCell className="text-center">
-                                                {investment.transactionProofUrl ? (
+                                                {plan.transactionProofUrl ? (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => openImageModal(investment.transactionProofUrl)}
+                                                        onClick={() => openImageModal(plan.transactionProofUrl)}
                                                     >
                                                         <ExternalLink className="mr-1 h-4 w-4" /> View
                                                     </Button>
@@ -439,6 +420,7 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
+          {/* Pending Withdrawals Tab - Stays mostly the same */}
           <TabsContent value="pending-withdrawals">
                <Card>
                   <CardHeader>
@@ -474,7 +456,7 @@ export default function DeveloperDashboardPage() {
                                           </TableCell>
                                           <TableCell>
                                                 <div>{request.investmentTitle}</div>
-                                                <div className="text-xs text-muted-foreground">ID: {request.investmentId.substring(0,10)}...</div>
+                                                <div className="text-xs text-muted-foreground">Inv. ID: {request.investmentId.substring(0,10)}...</div>
                                           </TableCell>
                                           <TableCell className="text-right font-medium">{formatCurrency(request.withdrawalAmount)}</TableCell>
                                           <TableCell className="capitalize">{request.paymentMethod}</TableCell>
@@ -518,6 +500,7 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
+          {/* User Management Tab */}
           <TabsContent value="user-management">
             <Card>
               <CardHeader>
@@ -525,7 +508,7 @@ export default function DeveloperDashboardPage() {
                 <CardDescription>View users who have submitted investments and their investment history.</CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoadingAllInvestments ? (
+                {isLoadingAllPlans ? (
                   <div className="flex justify-center items-center min-h-[200px]">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
                   </div>
@@ -588,38 +571,38 @@ export default function DeveloperDashboardPage() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {selectedUserInvestments.map((inv) => {
-                                  const startDate = inv.approvalDate ? (inv.approvalDate as Timestamp).toDate() : (inv.submissionDate as Timestamp).toDate();
-                                  const endDate = inv.approvalDate ? addDays(startDate, inv.duration) : null;
-                                   let displayStatus = inv.status.charAt(0).toUpperCase() + inv.status.slice(1);
-                                    if (inv.status === 'approved' && endDate && isPast(endDate) && inv.status !== 'completed') {
+                                {selectedUserInvestments.map((plan) => {
+                                  const planEndDate = plan.endDate ? (plan.endDate as Timestamp).toDate() : 
+                                                     (plan.approvalDate ? addDays((plan.approvalDate as Timestamp).toDate(), plan.durationInDays) : null);
+                                  let displayStatus = plan.status.charAt(0).toUpperCase() + plan.status.slice(1);
+                                    if (plan.status === 'approved' && planEndDate && isPast(planEndDate) && plan.status !== 'completed') {
                                       displayStatus = "Ended";
                                     }
 
                                   return (
-                                    <TableRow key={inv.id}>
+                                    <TableRow key={plan.id}>
                                       <TableCell>
-                                        {inv.planTitle}
-                                        {inv.transactionProofUrl && (
-                                          <Button variant="link" size="sm" className="h-auto p-0 ml-1 text-xs" onClick={() => openImageModal(inv.transactionProofUrl)}>
+                                        {plan.planTitle}
+                                        {plan.transactionProofUrl && (
+                                          <Button variant="link" size="sm" className="h-auto p-0 ml-1 text-xs" onClick={() => openImageModal(plan.transactionProofUrl)}>
                                              (Proof)
                                           </Button>
                                         )}
                                       </TableCell>
-                                      <TableCell className="text-right">{formatCurrency(inv.investmentAmount)}</TableCell>
-                                      <TableCell>{formatFirestoreTimestamp(inv.submissionDate, false)}</TableCell>
-                                      <TableCell>{inv.approvalDate ? formatFirestoreTimestamp(inv.approvalDate, false) : 'N/A'}</TableCell>
-                                      <TableCell>{endDate ? format(endDate, 'P') : 'N/A'}</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(plan.investmentAmount)}</TableCell>
+                                      <TableCell>{formatFirestoreTimestamp(plan.submissionDate, false)}</TableCell>
+                                      <TableCell>{plan.approvalDate ? formatFirestoreTimestamp(plan.approvalDate, false) : 'N/A'}</TableCell>
+                                      <TableCell>{planEndDate ? format(planEndDate, 'P') : 'N/A'}</TableCell>
                                       <TableCell>
                                         <Badge variant={
-                                            inv.status === 'approved' ? 'default' :
-                                            inv.status === 'completed' ? 'secondary' :
-                                            inv.status === 'pending' ? 'outline' :
-                                            inv.status === 'rejected' ? 'destructive' : 'outline'
+                                            plan.status === 'approved' ? 'default' :
+                                            plan.status === 'completed' ? 'secondary' :
+                                            plan.status === 'pending' ? 'outline' :
+                                            plan.status === 'rejected' ? 'destructive' : 'outline'
                                         }>
                                           {displayStatus}
-                                          {inv.status === 'rejected' && inv.rejectionReason && (
-                                            <span className="ml-1 opacity-70 text-xs">({inv.rejectionReason.substring(0,15)}...)</span>
+                                          {plan.status === 'rejected' && plan.rejectionReason && (
+                                            <span className="ml-1 opacity-70 text-xs">({plan.rejectionReason.substring(0,15)}...)</span>
                                           )}
                                         </Badge>
                                       </TableCell>
@@ -643,9 +626,9 @@ export default function DeveloperDashboardPage() {
               </CardContent>
             </Card>
           </TabsContent>
-
       </Tabs>
 
+      {/* Image Modal */}
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && closeImageModal()}>
         <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
           <DialogHeader>
@@ -684,12 +667,13 @@ export default function DeveloperDashboardPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Investment Rejection Modal */}
       <Dialog open={isRejectionModalOpen} onOpenChange={setIsRejectionModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Reject Investment</DialogTitle>
             <DialogDescription>
-              Provide a reason for rejecting this investment submission. This will be visible to the user if implemented.
+              Provide a reason for rejecting this investment submission. This may be visible to the user.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -703,21 +687,23 @@ export default function DeveloperDashboardPage() {
                 rows={3}
               />
             </div>
+             {currentPlanToReject && <p className="text-xs text-muted-foreground">Rejecting plan: {currentPlanToReject.planTitle} for {currentPlanToReject.userName}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRejectionModalOpen(false)}>Cancel</Button>
             <Button 
               variant="destructive" 
               onClick={handleConfirmRejectInvestment}
-              disabled={isProcessingInvestment[currentInvestmentToReject!] || !investmentRejectionReason.trim()}
+              disabled={isProcessingInvestment[currentPlanToReject?.id!] || !investmentRejectionReason.trim()}
             >
-              {isProcessingInvestment[currentInvestmentToReject!] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isProcessingInvestment[currentPlanToReject?.id!] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm Rejection
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Withdrawal Action Modal */}
       <Dialog open={!!withdrawalAction.request} onOpenChange={(open) => !open && closeWithdrawalActionModal()}>
             <DialogContent className="sm:max-w-[450px]">
                 <DialogHeader>
@@ -798,6 +784,5 @@ export default function DeveloperDashboardPage() {
     </div>
   );
 }
-
 
     

@@ -11,28 +11,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud, CheckCircle, AlertTriangle, Copy, Info } from 'lucide-react';
-import { plansData, type Plan } from '@/components/investment-plans'; // Assuming plansData is exported
+import { plansData, type Plan as PlanUIDetails } from '@/components/investment-plans'; 
 import Image from 'next/image';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { storage } from '@/lib/firebase'; // db is not directly needed here anymore for adding doc
+import { addInvestmentProofToUserPlans } from '@/lib/investment-store'; // New function
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const paymentDetails = {
   easypaisa: {
     accountName: "Adnan Tariq",
     accountNumber: "03411167577",
-    icon: "/payment-icons/easypaisa.png", // Add actual icon path
+    icon: "/payment-icons/easypaisa.png", 
   },
   jazzcash: {
     accountName: "Rupay Growth Investment",
     accountNumber: "03012345678",
-    icon: "/payment-icons/jazzcash.png", // Add actual icon path
+    icon: "/payment-icons/jazzcash.png", 
   },
   sadapay: {
     accountName: "Rupay Growth",
-    accountNumber: "03121145736", // Example, replace with actual
-    icon: "/payment-icons/sadapay.png", // Add actual icon path
+    accountNumber: "03121145736", 
+    icon: "/payment-icons/sadapay.png", 
   },
 };
 
@@ -47,8 +47,8 @@ export default function SubmitProofPage() {
   const { currentUser } = useAuth();
   const { toast } = useToast();
 
-  const planId = searchParams.get('planId');
-  const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null);
+  const planDefIdFromUrl = searchParams.get('planId'); // This is planDefId now
+  const [selectedPlanDef, setSelectedPlanDef] = React.useState<PlanUIDetails | null>(null);
   const [investmentAmount, setInvestmentAmount] = React.useState<string>('');
   const [amountError, setAmountError] = React.useState<string | null>(null);
   
@@ -59,11 +59,11 @@ export default function SubmitProofPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   React.useEffect(() => {
-    if (planId) {
-      const plan = plansData.find(p => p.id === planId);
+    if (planDefIdFromUrl) {
+      const plan = plansData.find(p => p.id === planDefIdFromUrl);
       if (plan) {
-        setSelectedPlan(plan);
-        setInvestmentAmount(plan.minInvestment.toString()); // Default to min investment
+        setSelectedPlanDef(plan);
+        setInvestmentAmount(plan.minInvestment.toString()); 
       } else {
         toast({ title: "Error", description: "Invalid investment plan selected.", variant: "destructive" });
         router.push('/');
@@ -72,7 +72,7 @@ export default function SubmitProofPage() {
       toast({ title: "Error", description: "No investment plan specified.", variant: "destructive" });
       router.push('/');
     }
-  }, [planId, router, toast]);
+  }, [planDefIdFromUrl, router, toast]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -102,10 +102,10 @@ export default function SubmitProofPage() {
     const value = e.target.value;
     if (value === '' || /^[0-9]*$/.test(value)) {
       setInvestmentAmount(value);
-      if (selectedPlan) {
+      if (selectedPlanDef) {
         const numAmount = parseInt(value, 10);
-        if (isNaN(numAmount) || numAmount < selectedPlan.minInvestment || numAmount > selectedPlan.maxInvestment) {
-          setAmountError(`Amount must be between ${formatCurrency(selectedPlan.minInvestment)} and ${formatCurrency(selectedPlan.maxInvestment)}.`);
+        if (isNaN(numAmount) || numAmount < selectedPlanDef.minInvestment || numAmount > selectedPlanDef.maxInvestment) {
+          setAmountError(`Amount must be between ${formatCurrency(selectedPlanDef.minInvestment)} and ${formatCurrency(selectedPlanDef.maxInvestment)}.`);
         } else {
           setAmountError(null);
         }
@@ -122,14 +122,14 @@ export default function SubmitProofPage() {
   };
 
   const handleSubmit = async () => {
-    if (!currentUser || !selectedPlan || !selectedFile || !investmentAmount || amountError) {
+    if (!currentUser || !selectedPlanDef || !selectedFile || !investmentAmount || amountError) {
       toast({ title: "Missing Information", description: "Please fill all fields correctly and upload proof.", variant: "destructive" });
       return;
     }
 
     const numericAmount = parseInt(investmentAmount, 10);
-    if (isNaN(numericAmount) || numericAmount < selectedPlan.minInvestment || numericAmount > selectedPlan.maxInvestment) {
-        toast({ title: "Invalid Amount", description: `Investment amount must be between ${formatCurrency(selectedPlan.minInvestment)} and ${formatCurrency(selectedPlan.maxInvestment)}.`, variant: "destructive" });
+    if (isNaN(numericAmount) || numericAmount < selectedPlanDef.minInvestment || numericAmount > selectedPlanDef.maxInvestment) {
+        toast({ title: "Invalid Amount", description: `Investment amount must be between ${formatCurrency(selectedPlanDef.minInvestment)} and ${formatCurrency(selectedPlanDef.maxInvestment)}.`, variant: "destructive" });
         return;
     }
 
@@ -154,31 +154,24 @@ export default function SubmitProofPage() {
         async () => {
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
           
-          const investmentData = {
-            userId: currentUser.uid,
-            userPhoneNumber: currentUser.email?.split('@')[0] || 'N/A', // Assuming phone is local part of email
-            userName: currentUser.email?.split('@')[0] || currentUser.uid, // Placeholder for userName
-            planId: selectedPlan.id,
-            planTitle: selectedPlan.title,
-            investmentAmount: numericAmount,
-            minInvestment: selectedPlan.minInvestment,
-            maxInvestment: selectedPlan.maxInvestment,
-            dailyProfitMin: selectedPlan.dailyProfitMin,
-            dailyProfitMax: selectedPlan.dailyProfitMax,
-            duration: selectedPlan.duration,
-            iconName: selectedPlan.iconName, // Ensure Plan interface includes iconName
-            transactionProofUrl: downloadURL,
-            submissionDate: serverTimestamp(), // Firestore server timestamp
-            status: 'pending',
-            referralBonusPercent: 0, // Default or implement referral logic
-          };
+          // User's current name and phone from auth context
+          // Firebase email 'phone@example.com' -> 'phone'
+          const userPhoneForRecord = currentUser.email?.split('@')[0] || currentUser.uid; 
+          const userNameForRecord = currentUser.email?.split('@')[0] || 'User'; // Fallback for username
 
-          await addDoc(collection(db, "investments"), investmentData);
+          await addInvestmentProofToUserPlans(
+            currentUser.uid,
+            userNameForRecord,
+            userPhoneForRecord,
+            selectedPlanDef,
+            numericAmount,
+            downloadURL
+          );
 
           toast({ title: "Submission Successful!", description: "Your investment proof has been submitted for review." });
           setIsUploading(false);
           setIsSubmitting(false);
-          router.push('/dashboard'); // Redirect to user dashboard
+          router.push('/dashboard'); 
         }
       );
     } catch (error: any) {
@@ -189,7 +182,7 @@ export default function SubmitProofPage() {
     }
   };
 
-  if (!selectedPlan) {
+  if (!selectedPlanDef) {
     return (
       <ProtectedRoute>
         <div className="container mx-auto flex justify-center items-center min-h-[calc(100vh-200px)]">
@@ -206,7 +199,7 @@ export default function SubmitProofPage() {
         <Card className="max-w-2xl mx-auto shadow-xl">
           <CardHeader>
             <CardTitle className="text-2xl text-primary">Submit Investment Proof</CardTitle>
-            <CardDescription>You are investing in the <strong className="text-foreground">{selectedPlan.title}</strong>.</CardDescription>
+            <CardDescription>You are investing in the <strong className="text-foreground">{selectedPlanDef.title}</strong>.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
@@ -218,7 +211,6 @@ export default function SubmitProofPage() {
                 {Object.entries(paymentDetails).map(([key, detail]) => (
                   <Card key={key} className="p-4 bg-muted/50">
                     <div className="flex items-center mb-2">
-                       {/* Placeholder for icons - replace with actual Image components if you have icons */}
                       <span className="text-lg font-semibold capitalize text-primary">{key}</span>
                     </div>
                     <p className="text-xs">Account Name: <strong className="text-foreground">{detail.accountName}</strong></p>
@@ -249,12 +241,12 @@ export default function SubmitProofPage() {
                 inputMode="numeric"
                 value={investmentAmount}
                 onChange={handleAmountChange}
-                placeholder={`e.g., ${selectedPlan.minInvestment}`}
+                placeholder={`e.g., ${selectedPlanDef.minInvestment}`}
                 className={amountError ? 'border-destructive' : ''}
               />
               {amountError && <p className="text-sm text-destructive">{amountError}</p>}
                <p className="text-xs text-muted-foreground">
-                Min: {formatCurrency(selectedPlan.minInvestment)}, Max: {formatCurrency(selectedPlan.maxInvestment)}
+                Min: {formatCurrency(selectedPlanDef.minInvestment)}, Max: {formatCurrency(selectedPlanDef.maxInvestment)}
               </p>
             </div>
 
@@ -312,3 +304,4 @@ export default function SubmitProofPage() {
   );
 }
 
+    

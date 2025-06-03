@@ -2,13 +2,13 @@
 "use client";
 
 import * as React from 'react';
-import type { InvestmentSubmissionFirestore } from '@/lib/investment-store'; 
+import type { UserPlanData } from '@/lib/investment-store'; 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { differenceInDays, addDays, format, isPast, formatDistanceToNowStrict } from 'date-fns'; 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DollarSign, CalendarDays, TrendingUp, Percent, Hourglass, User, CheckCircle, Banknote, Wallet, Info, Loader2, Gift, AlertCircle } from 'lucide-react'; 
+import { DollarSign, CalendarDays, TrendingUp, Percent, Hourglass, CheckCircle, Banknote, Wallet, Info, Loader2, Gift, AlertCircle } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -30,9 +30,10 @@ import {
 } from '@/lib/withdrawal-store'; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { Timestamp } from 'firebase/firestore';
+import { icons } from 'lucide-react'; // For dynamic icon loading
 
 interface DashboardProps {
-  plan: InvestmentSubmissionFirestore; 
+  planData: UserPlanData; 
 }
 
 const formatCurrency = (amount: number): string => {
@@ -67,15 +68,14 @@ interface DailyProfitEntry {
   cumulativeMax: number;
 }
 
-export function Dashboard({ plan }: DashboardProps) {
+export function Dashboard({ planData }: DashboardProps) {
   const { toast } = useToast();
-  // Ensure plan.approvalDate is a Date object for calculations
   const startDate = React.useMemo(() => {
-    if (!plan.approvalDate) return null;
-    return (plan.approvalDate as Timestamp).toDate();
-  }, [plan.approvalDate]);
+    if (!planData.approvalDate) return null;
+    return (planData.approvalDate as Timestamp).toDate();
+  }, [planData.approvalDate]);
 
-  const referralBonus = React.useMemo(() => plan.referralBonusPercent ?? 0, [plan.referralBonusPercent]);
+  const referralBonus = React.useMemo(() => planData.referralBonusAppliedPercent ?? 0, [planData.referralBonusAppliedPercent]);
   const [currentDate, setCurrentDate] = React.useState<Date>(new Date());
   const [dailyProfits, setDailyProfits] = React.useState<DailyProfitEntry[]>([]);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = React.useState(false);
@@ -85,23 +85,29 @@ export function Dashboard({ plan }: DashboardProps) {
   const [existingWithdrawalRequest, setExistingWithdrawalRequest] = React.useState<WithdrawalRequestFirestore | null>(null);
   const [isLoadingWithdrawalStatus, setIsLoadingWithdrawalStatus] = React.useState(true);
 
+  const PlanIconComponent = React.useMemo(() => {
+    const LucideIcon = icons[planData.planIconName as keyof typeof icons];
+    return LucideIcon || DollarSign; // Fallback icon
+  }, [planData.planIconName]);
+
+
   React.useEffect(() => {
-    const interval = setInterval(() => setCurrentDate(new Date()), 1000 * 60); // Refresh current time every minute
+    const interval = setInterval(() => setCurrentDate(new Date()), 1000 * 60); 
     return () => clearInterval(interval);
   }, []);
 
   React.useEffect(() => {
-    if (!startDate) return; // Don't calculate if plan isn't approved yet
+    if (!startDate) return; 
     const calculateProfits = () => {
       const profits: DailyProfitEntry[] = [];
       let cumulativeMin = 0;
       let cumulativeMax = 0;
-      const investmentAmount = plan.investmentAmount;
+      const investmentAmount = planData.investmentAmount;
 
-      const effectiveDailyProfitMin = plan.dailyProfitMin + referralBonus;
-      const effectiveDailyProfitMax = plan.dailyProfitMax + referralBonus;
+      const effectiveDailyProfitMin = planData.baseDailyProfitMin + referralBonus;
+      const effectiveDailyProfitMax = planData.baseDailyProfitMax + referralBonus;
 
-      for (let i = 1; i <= plan.duration; i++) {
+      for (let i = 1; i <= planData.durationInDays; i++) {
         const profitDate = addDays(startDate, i - 1);
         const dailyMin = (investmentAmount * effectiveDailyProfitMin) / 100;
         const dailyMax = (investmentAmount * effectiveDailyProfitMax) / 100;
@@ -119,14 +125,14 @@ export function Dashboard({ plan }: DashboardProps) {
       setDailyProfits(profits);
     };
     calculateProfits();
-  }, [plan, startDate, referralBonus]);
+  }, [planData, startDate, referralBonus]);
 
   React.useEffect(() => {
     const fetchWithdrawalStatus = async () => {
-      if (plan.id && plan.userId && plan.status !== 'pending') { // Only fetch if plan is active/completed and has ID
+      if (planData.id && planData.userId && planData.status !== 'pending') { 
         setIsLoadingWithdrawalStatus(true);
         try {
-          const request = await getWithdrawalRequestForInvestmentFromFirestore(plan.id, plan.userId);
+          const request = await getWithdrawalRequestForInvestmentFromFirestore(planData.id, planData.userId);
           setExistingWithdrawalRequest(request);
         } catch (error) {
           console.error("Error fetching withdrawal status:", error);
@@ -135,22 +141,22 @@ export function Dashboard({ plan }: DashboardProps) {
           setIsLoadingWithdrawalStatus(false);
         }
       } else {
-        setIsLoadingWithdrawalStatus(false); // No need to load if plan not suitable for withdrawal check
+        setIsLoadingWithdrawalStatus(false); 
       }
     };
     fetchWithdrawalStatus();
-  }, [plan.id, plan.userId, plan.status, toast]);
+  }, [planData.id, planData.userId, planData.status, toast]);
 
 
-  if (plan.status === 'pending') {
+  if (planData.status === 'pending') {
     return (
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-amber-600">
-                <Hourglass className="h-5 w-5" /> {plan.planTitle} - Pending Approval
+                <Hourglass className="h-5 w-5" /> {planData.planTitle} - Pending Approval
             </CardTitle>
             <CardDescription>
-                Submitted on: {formatFirestoreTimestamp(plan.submissionDate)}. Your investment of {formatCurrency(plan.investmentAmount)} is awaiting admin approval.
+                Submitted on: {formatFirestoreTimestamp(planData.submissionDate)}. Your investment of {formatCurrency(planData.investmentAmount)} is awaiting admin approval.
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -168,15 +174,15 @@ export function Dashboard({ plan }: DashboardProps) {
     )
   }
 
-  if (plan.status === 'rejected') {
+  if (planData.status === 'rejected') {
      return (
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-destructive">
-                <AlertCircle className="h-5 w-5" /> {plan.planTitle} - Submission Rejected
+                <AlertCircle className="h-5 w-5" /> {planData.planTitle} - Submission Rejected
             </CardTitle>
             <CardDescription>
-                 Submitted on: {formatFirestoreTimestamp(plan.submissionDate)}. Amount: {formatCurrency(plan.investmentAmount)}.
+                 Submitted on: {formatFirestoreTimestamp(planData.submissionDate)}. Amount: {formatCurrency(planData.investmentAmount)}.
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -185,7 +191,7 @@ export function Dashboard({ plan }: DashboardProps) {
                 <AlertTitle>Investment Rejected</AlertTitle>
                 <AlertDescription>
                   Unfortunately, your investment submission was rejected. 
-                  {plan.rejectionReason && <p className="mt-1"><strong>Reason:</strong> {plan.rejectionReason}</p>}
+                  {planData.rejectionReason && <p className="mt-1"><strong>Reason:</strong> {planData.rejectionReason}</p>}
                   <p className="mt-2">Please review the reason and contact support if you have questions or wish to resubmit with corrections.</p>
                 </AlertDescription>
             </Alert>
@@ -195,7 +201,7 @@ export function Dashboard({ plan }: DashboardProps) {
   }
 
 
-  if (!startDate) { // Should only happen if status is approved but approvalDate is missing (data inconsistency)
+  if (!startDate) { 
     return (
         <Card>
             <CardHeader><CardTitle>Loading Investment Data...</CardTitle></CardHeader>
@@ -204,24 +210,24 @@ export function Dashboard({ plan }: DashboardProps) {
     );
   }
 
-  const endDate = addDays(startDate, plan.duration);
-  const isPlanComplete = plan.status === 'completed' || (plan.status === 'approved' && isPast(endDate));
+  const planEndDate = planData.endDate ? (planData.endDate as Timestamp).toDate() : addDays(startDate, planData.durationInDays);
+  const isPlanEffectivelyComplete = planData.status === 'completed' || (planData.status === 'approved' && isPast(planEndDate));
   
-  const daysElapsed = Math.min(plan.duration, Math.max(0, differenceInDays(currentDate, startDate)));
-  const daysRemaining = Math.max(0, plan.duration - daysElapsed);
-  const progress = Math.min(100, Math.max(0,(daysElapsed / plan.duration) * 100));
+  const daysElapsed = Math.min(planData.durationInDays, Math.max(0, differenceInDays(currentDate, startDate)));
+  const daysRemaining = Math.max(0, planData.durationInDays - daysElapsed);
+  const progress = Math.min(100, Math.max(0,(daysElapsed / planData.durationInDays) * 100));
 
-   const currentProfitIndex = Math.min(daysElapsed > 0 ? daysElapsed : 1, plan.duration) - 1;
+   const currentProfitIndex = Math.min(daysElapsed > 0 ? daysElapsed : 1, planData.durationInDays) - 1;
    const currentCumulativeMin = currentProfitIndex >= 0 && dailyProfits.length > currentProfitIndex ? dailyProfits[currentProfitIndex]?.cumulativeMin ?? 0 : 0;
    const currentCumulativeMax = currentProfitIndex >= 0 && dailyProfits.length > currentProfitIndex ? dailyProfits[currentProfitIndex]?.cumulativeMax ?? 0 : 0;
    const currentCumulativeProfitText = currentCumulativeMin === currentCumulativeMax
      ? formatCurrency(currentCumulativeMin)
      : `${formatCurrency(currentCumulativeMin)} – ${formatCurrency(currentCumulativeMax)}`;
 
-  const finalTotalProfitMin = dailyProfits[plan.duration - 1]?.cumulativeMin ?? 0;
-  const finalTotalProfitMax = dailyProfits[plan.duration - 1]?.cumulativeMax ?? 0;
-  const finalTotalReturnMin = plan.investmentAmount + finalTotalProfitMin;
-  const finalTotalReturnMax = plan.investmentAmount + finalTotalProfitMax;
+  const finalTotalProfitMin = dailyProfits[planData.durationInDays - 1]?.cumulativeMin ?? 0;
+  const finalTotalProfitMax = dailyProfits[planData.durationInDays - 1]?.cumulativeMax ?? 0;
+  const finalTotalReturnMin = planData.investmentAmount + finalTotalProfitMin;
+  const finalTotalReturnMax = planData.investmentAmount + finalTotalProfitMax;
    const finalTotalReturnText = finalTotalReturnMin === finalTotalReturnMax
     ? formatCurrency(finalTotalReturnMin)
     : `${formatCurrency(finalTotalReturnMin)} – ${formatCurrency(finalTotalReturnMax)}`;
@@ -229,16 +235,15 @@ export function Dashboard({ plan }: DashboardProps) {
     ? formatCurrency(finalTotalProfitMin)
     : `${formatCurrency(finalTotalProfitMin)} – ${formatCurrency(finalTotalProfitMax)}`;
 
-   const effectiveDailyProfitMin = plan.dailyProfitMin + referralBonus;
-   const effectiveDailyProfitMax = plan.dailyProfitMax + referralBonus;
+   const effectiveDailyProfitMin = planData.baseDailyProfitMin + referralBonus;
+   const effectiveDailyProfitMax = planData.baseDailyProfitMax + referralBonus;
    const effectiveDailyProfitRangeText = effectiveDailyProfitMin === effectiveDailyProfitMax
      ? `${effectiveDailyProfitMin.toFixed(1)}%`
      : `${effectiveDailyProfitMin.toFixed(1)}% – ${effectiveDailyProfitMax.toFixed(1)}%`;
 
-  const PlanIconComponent = plan.iconName ? TrendingUp : DollarSign; // Simple fallback
 
   const handleRequestWithdrawal = async () => {
-      if (!withdrawalMethod || !accountNumber.trim() || !plan.id || !plan.userId || !plan.userName || !plan.userPhoneNumber) {
+      if (!withdrawalMethod || !accountNumber.trim() || !planData.id || !planData.userId || !planData.userName || !planData.userPhoneNumber) {
           toast({ variant: "destructive", title: "Missing Information", description: "Please select a withdrawal method and enter your account number." });
           return;
       }
@@ -248,14 +253,13 @@ export function Dashboard({ plan }: DashboardProps) {
       }
       setIsSubmittingWithdrawal(true);
       try {
-          // Use the maximum potential return for withdrawal amount, or adjust as per business logic
           const withdrawalAmount = finalTotalReturnMax; 
           const requestData: Omit<WithdrawalRequestFirestore, 'id' | 'status' | 'requestDate' | 'processedDate' | 'rejectionReason' | 'transactionId'> = {
-              userId: plan.userId, 
-              userName: plan.userName,
-              userPhoneNumber: plan.userPhoneNumber,
-              investmentId: plan.id,
-              investmentTitle: plan.planTitle, // use planTitle from investment
+              userId: planData.userId, 
+              userName: planData.userName, // Use denormalized name from planData
+              userPhoneNumber: planData.userPhoneNumber, // Use denormalized phone from planData
+              investmentId: planData.id!, // ID of the plan investment document
+              investmentTitle: planData.planTitle, 
               withdrawalAmount: withdrawalAmount,
               paymentMethod: withdrawalMethod,
               accountNumber: accountNumber.trim(),
@@ -279,10 +283,10 @@ export function Dashboard({ plan }: DashboardProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl text-primary">
-            <PlanIconComponent className="h-6 w-6" /> {plan.planTitle} Overview
+            <PlanIconComponent className="h-6 w-6" /> {planData.planTitle} Overview
           </CardTitle>
           <CardDescription>
-              Approved on {formatFirestoreTimestamp(plan.approvalDate)}.
+              Approved on {formatFirestoreTimestamp(planData.approvalDate)}.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -290,7 +294,7 @@ export function Dashboard({ plan }: DashboardProps) {
             <DollarSign className="h-6 w-6 text-muted-foreground" />
             <div>
               <p className="text-sm font-medium leading-none">Your Investment</p>
-              <p className="text-lg font-semibold">{formatCurrency(plan.investmentAmount)}</p>
+              <p className="text-lg font-semibold">{formatCurrency(planData.investmentAmount)}</p>
             </div>
           </div>
           <div className="flex items-center space-x-3 rounded-md border p-4 bg-muted/50">
@@ -300,7 +304,7 @@ export function Dashboard({ plan }: DashboardProps) {
               <p className="text-lg font-semibold">{effectiveDailyProfitRangeText}</p>
               {referralBonus > 0 && (
                    <p className="text-xs text-muted-foreground">
-                       ({plan.dailyProfitMin.toFixed(1)}% Base + {referralBonus.toFixed(1)}% Bonus)
+                       ({planData.baseDailyProfitMin.toFixed(1)}% Base + {referralBonus.toFixed(1)}% Bonus)
                    </p>
                )}
             </div>
@@ -309,17 +313,17 @@ export function Dashboard({ plan }: DashboardProps) {
              <CalendarDays className="h-6 w-6 text-muted-foreground" />
             <div>
               <p className="text-sm font-medium leading-none">Plan Duration</p>
-              <p className="text-lg font-semibold">{plan.duration} days</p>
+              <p className="text-lg font-semibold">{planData.durationInDays} days</p>
             </div>
           </div>
           <div className="flex items-center space-x-3 rounded-md border p-4 bg-muted/50">
             <Hourglass className="h-6 w-6 text-muted-foreground" />
             <div>
               <p className="text-sm font-medium leading-none">Ends On</p>
-              <p className="text-lg font-semibold">{format(endDate, 'PPP')}</p>
+              <p className="text-lg font-semibold">{format(planEndDate, 'PPP')}</p>
             </div>
           </div>
-           {!isPlanComplete && (
+           {!isPlanEffectivelyComplete && (
                <div className="flex items-center space-x-3 rounded-md border p-4 bg-primary/10 text-primary">
                 <TrendingUp className="h-6 w-6" />
                 <div>
@@ -328,7 +332,7 @@ export function Dashboard({ plan }: DashboardProps) {
                 </div>
               </div>
            )}
-           {isPlanComplete && (
+           {isPlanEffectivelyComplete && (
               <div className="flex items-center space-x-3 rounded-md border p-4 bg-primary/10 text-primary">
                  <TrendingUp className="h-6 w-6" />
                   <div>
@@ -350,7 +354,7 @@ export function Dashboard({ plan }: DashboardProps) {
                     <div>
                         <p className="text-sm font-medium leading-none">Referral Bonus Applied</p>
                         <p className="text-lg font-semibold">+{referralBonus.toFixed(1)}% Daily Profit</p>
-                         <p className="text-xs text-muted-foreground">Your daily profit includes an extra {referralBonus.toFixed(1)}% (details may vary).</p>
+                         <p className="text-xs text-muted-foreground">Your daily profit includes an extra {referralBonus.toFixed(1)}%.</p>
                     </div>
                 </div>
             )}
@@ -361,13 +365,13 @@ export function Dashboard({ plan }: DashboardProps) {
         <CardHeader>
           <CardTitle>Investment Progress</CardTitle>
           <CardDescription>
-            {daysElapsed} of {plan.duration} days completed. {daysRemaining > 0 ? `${formatDistanceToNowStrict(endDate, {unit: 'day'})} remaining.` : 'Plan completed.'}
+            {daysElapsed} of {planData.durationInDays} days completed. {daysRemaining > 0 ? `${formatDistanceToNowStrict(planEndDate, {unit: 'day'})} remaining.` : 'Plan completed.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Progress value={progress} className="w-full h-4" />
            <p className="text-right text-sm text-muted-foreground mt-1">{progress.toFixed(1)}% complete</p>
-           {isPlanComplete && (
+           {isPlanEffectivelyComplete && (
                 <div className="mt-6 text-center">
                     {isLoadingWithdrawalStatus ? (
                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
@@ -421,7 +425,7 @@ export function Dashboard({ plan }: DashboardProps) {
                 </TableHeader>
                 <TableBody>
                     {dailyProfits.map((entry) => {
-                    const entryDate = new Date(entry.date); // Assumes entry.date is a parseable string
+                    const entryDate = new Date(entry.date); 
                     entryDate.setHours(23, 59, 59, 999); 
                     const isEntryPastOrToday = currentDate >= entryDate;
                     const dailyProfitText = entry.profitMin === entry.profitMax
@@ -431,13 +435,13 @@ export function Dashboard({ plan }: DashboardProps) {
                             ? formatCurrency(entry.cumulativeMin)
                             : `${formatCurrency(entry.cumulativeMin)} – ${formatCurrency(entry.cumulativeMax)}`;
                     return (
-                        <TableRow key={entry.day} className={isEntryPastOrToday && !isPlanComplete ? 'bg-muted/30' : ''}>
+                        <TableRow key={entry.day} className={isEntryPastOrToday && !isPlanEffectivelyComplete ? 'bg-muted/30' : ''}>
                         <TableCell className="font-medium">{entry.day}</TableCell>
                         <TableCell>{entry.date}</TableCell>
-                        <TableCell className={`text-right ${isEntryPastOrToday && !isPlanComplete ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                        <TableCell className={`text-right ${isEntryPastOrToday && !isPlanEffectivelyComplete ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                             {dailyProfitText}
                         </TableCell>
-                        <TableCell className={`text-right ${isEntryPastOrToday && !isPlanComplete ? 'font-semibold' : 'text-muted-foreground'}`}>
+                        <TableCell className={`text-right ${isEntryPastOrToday && !isPlanEffectivelyComplete ? 'font-semibold' : 'text-muted-foreground'}`}>
                             {cumulativeProfitText}
                         </TableCell>
                         </TableRow>
@@ -449,7 +453,6 @@ export function Dashboard({ plan }: DashboardProps) {
             </CardContent>
         </Card>
       )}
-
 
         <Dialog open={isWithdrawalModalOpen} onOpenChange={setIsWithdrawalModalOpen}>
             <DialogContent className="sm:max-w-[480px]">
@@ -472,7 +475,6 @@ export function Dashboard({ plan }: DashboardProps) {
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="easypaisa" id="r-easypaisa" />
                                 <Label htmlFor="r-easypaisa" className="font-normal flex items-center gap-1">
-                                     {/* Replace with actual Easypaisa icon if available */}
                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 10v-2m0-4h.01M7.757 14.757l-.707.707M16.243 14.757l.707.707M9.172 10.172a4 4 0 015.656 0M14.828 10.172a4 4 0 01-5.656 0" /></svg>
                                      Easypaisa
                                  </Label>
@@ -480,7 +482,6 @@ export function Dashboard({ plan }: DashboardProps) {
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="jazzcash" id="r-jazzcash" />
                                 <Label htmlFor="r-jazzcash" className="font-normal flex items-center gap-1">
-                                     {/* Replace with actual JazzCash icon if available */}
                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10s5 2 5 2 1 .5 1 1 .5 1 1 1-1 .5-1 1-.5 1-1 1-2 1-2 1-2.47 2-4.529 2M12 18a6 6 0 006-6M12 18a6 6 0 01-6-6" /></svg>
                                      JazzCash
                                  </Label>
@@ -530,3 +531,5 @@ export function Dashboard({ plan }: DashboardProps) {
     </div>
   );
 }
+
+    

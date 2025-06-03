@@ -8,45 +8,57 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { InvestmentPlans } from '@/components/investment-plans';
-import { Dashboard as UserInvestmentDashboard } from '@/components/dashboard'; // Renamed import
-import { getActiveInvestmentsForUserFromFirestore, type InvestmentSubmissionFirestore } from '@/lib/investment-store';
-import { Loader2, AlertTriangle, PlusCircle } from 'lucide-react'; // Added AlertTriangle
+import { Dashboard as UserInvestmentDashboard } from '@/components/dashboard'; // Component that displays a single investment plan
+import { getUserPlans, type UserPlanData } from '@/lib/investment-store'; // Updated import
+import { Loader2, AlertTriangle, PlusCircle, Wallet } from 'lucide-react'; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+const formatCurrency = (amount: number): string => {
+  if (!Number.isFinite(amount)) {
+    return 'PKR 0.00';
+  }
+  return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 
 export default function DashboardPage() {
   const { currentUser, logoutUser } = useAuth();
   const router = useRouter();
-  const [userInvestments, setUserInvestments] = React.useState<InvestmentSubmissionFirestore[]>([]);
+  const [userPlans, setUserPlans] = React.useState<UserPlanData[]>([]); // Updated type
   const [isLoadingInvestments, setIsLoadingInvestments] = React.useState(true);
+  const [totalInvested, setTotalInvested] = React.useState(0);
 
   React.useEffect(() => {
     if (currentUser?.uid) {
       setIsLoadingInvestments(true);
-      getActiveInvestmentsForUserFromFirestore(currentUser.uid)
-        .then(investments => {
-          setUserInvestments(investments);
+      getUserPlans(currentUser.uid) // Use new function
+        .then(plans => {
+          setUserPlans(plans);
+          const currentTotalInvested = plans
+            .filter(p => p.status === 'approved' || p.status === 'completed') // Only sum approved/completed
+            .reduce((sum, p) => sum + p.investmentAmount, 0);
+          setTotalInvested(currentTotalInvested);
         })
         .catch(error => {
           console.error("Error fetching user investments:", error);
-          // Optionally show a toast message
         })
         .finally(() => {
           setIsLoadingInvestments(false);
         });
     } else {
-      setIsLoadingInvestments(false); // No user, so not loading
+      setIsLoadingInvestments(false); 
     }
   }, [currentUser?.uid]);
 
-  const hasActiveOrPendingInvestment = userInvestments.some(
-    inv => inv.status === 'approved' || inv.status === 'pending'
+  const hasActiveOrPendingInvestment = userPlans.some(
+    p => p.status === 'approved' || p.status === 'pending'
   );
 
   return (
     <ProtectedRoute>
       <div className="container mx-auto px-4 py-8 space-y-8">
         <Card className="shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="text-2xl font-bold text-primary">
                 Welcome, {currentUser?.email?.split('@')[0] || 'Investor'}!
@@ -55,11 +67,24 @@ export default function DashboardPage() {
                 Manage your investments and track your financial growth with Rupay Growth.
               </CardDescription>
             </div>
-            <Button variant="outline" onClick={() => {
-              logoutUser().then(() => router.push('/login'));
-            }}>
-              Logout
-            </Button>
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-2 w-full sm:w-auto">
+                 {userPlans.length > 0 && !isLoadingInvestments && (
+                    <Card className="p-3 bg-muted/50 w-full sm:w-auto">
+                        <div className="flex items-center space-x-2">
+                            <Wallet className="h-5 w-5 text-primary" />
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground">Total Active Investment</p>
+                                <p className="text-md font-semibold">{formatCurrency(totalInvested)}</p>
+                            </div>
+                        </div>
+                    </Card>
+                 )}
+                <Button variant="outline" onClick={() => {
+                logoutUser().then(() => router.push('/login'));
+                }} className="w-full sm:w-auto">
+                Logout
+                </Button>
+            </div>
           </CardHeader>
         </Card>
 
@@ -68,10 +93,10 @@ export default function DashboardPage() {
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="ml-3 text-muted-foreground">Loading your investments...</p>
           </div>
-        ) : userInvestments.length > 0 ? (
+        ) : userPlans.length > 0 ? (
           <div className="space-y-6">
-            {userInvestments.map(investment => (
-               <UserInvestmentDashboard key={investment.id} plan={investment} />
+            {userPlans.map(plan => ( // Iterate over userPlans
+               <UserInvestmentDashboard key={plan.id} planData={plan} /> // Pass planData
             ))}
           </div>
         ) : (
@@ -88,7 +113,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {!hasActiveOrPendingInvestment && !isLoadingInvestments && (
+        {(!hasActiveOrPendingInvestment || userPlans.length === 0) && !isLoadingInvestments && (
           <section id="explore-plans" className="pt-8">
              <Card>
                 <CardHeader>
@@ -110,3 +135,5 @@ export default function DashboardPage() {
     </ProtectedRoute>
   );
 }
+
+    
