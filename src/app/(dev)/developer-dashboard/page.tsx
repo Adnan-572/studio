@@ -4,25 +4,25 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  getPendingInvestmentsFromFirestore, // Use new Firestore function
-  approveInvestmentInFirestore,       // Use new Firestore function
-  rejectInvestmentInFirestore,        // Use new Firestore function
-  getApprovedInvestmentsFromFirestore, // Use new Firestore function
+  getPendingInvestmentsFromFirestore, 
+  approveInvestmentInFirestore,       
+  rejectInvestmentInFirestore,        
+  getApprovedInvestmentsFromFirestore, 
   type InvestmentSubmissionFirestore, 
 } from '@/lib/investment-store';
 import {
-  getPendingWithdrawalRequests, // Assuming this will also come from Firestore later
-  updateWithdrawalStatus,    
+  getPendingWithdrawalRequestsFromFirestore, // Use new Firestore function
+  updateWithdrawalStatusInFirestore,    // Use new Firestore function
   type WithdrawalRequestFirestore, 
-} from '@/lib/withdrawal-store'; // Keep withdrawal store as is for now
+} from '@/lib/withdrawal-store'; 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, isPast } from 'date-fns';
-import Image from 'next/image'; // For displaying screenshots
-import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Ban } from 'lucide-react';
+import Image from 'next/image'; 
+import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Ban, WalletCards } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -45,7 +45,6 @@ const formatCurrency = (amount: number): string => {
   return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: amount > 1000 ? 0 : 2, maximumFractionDigits: 2 })}`;
 };
 
-// Helper to convert Firestore Timestamp to readable date string
 const formatFirestoreTimestamp = (timestamp: Timestamp | string | undefined | null, includeTime: boolean = true): string => {
   if (!timestamp) return 'N/A';
   let date: Date;
@@ -74,9 +73,11 @@ export default function DeveloperDashboardPage() {
   const [isProcessingInvestment, setIsProcessingInvestment] = React.useState<Record<string, boolean>>({});
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = React.useState<Record<string, boolean>>({});
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
+  
   const [withdrawalAction, setWithdrawalAction] = React.useState<{ type: 'complete' | 'reject', request: WithdrawalRequestFirestore | null }>({ type: 'complete', request: null });
-  const [transactionId, setTransactionId] = React.useState('');
-  const [rejectionReason, setRejectionReason] = React.useState('');
+  const [transactionIdInput, setTransactionIdInput] = React.useState(''); // Renamed to avoid conflict
+  const [rejectionReasonInput, setRejectionReasonInput] = React.useState(''); // Renamed
+  
   const [investmentRejectionReason, setInvestmentRejectionReason] = React.useState('');
   const [isRejectionModalOpen, setIsRejectionModalOpen] = React.useState(false);
   const [currentInvestmentToReject, setCurrentInvestmentToReject] = React.useState<string | null>(null);
@@ -89,7 +90,7 @@ export default function DeveloperDashboardPage() {
       const pending = await getPendingInvestmentsFromFirestore(); 
       setPendingInvestments(pending);
     } catch (err) {
-      toast({ title: 'Error Fetching Pending', description: 'Could not load pending investments.', variant: 'destructive' });
+      toast({ title: 'Error Fetching Pending Inv.', description: 'Could not load pending investments.', variant: 'destructive' });
     }
     setIsLoadingInvestments(false);
 
@@ -98,14 +99,13 @@ export default function DeveloperDashboardPage() {
       const active = await getApprovedInvestmentsFromFirestore(); 
       setActiveInvestments(active);
     } catch (err) {
-       toast({ title: 'Error Fetching Active', description: 'Could not load active investments.', variant: 'destructive' });
+       toast({ title: 'Error Fetching Active Inv.', description: 'Could not load active investments.', variant: 'destructive' });
     }
     setIsLoadingActive(false);
 
     setIsLoadingWithdrawals(true);
     try {
-      // TODO: Replace with actual Firestore call for withdrawals
-      const pendingW = getPendingWithdrawalRequests(); 
+      const pendingW = await getPendingWithdrawalRequestsFromFirestore(); 
       setPendingWithdrawals(pendingW);
     } catch (err) {
       toast({ title: 'Error Fetching Withdrawals', description: 'Could not load pending withdrawals.', variant: 'destructive' });
@@ -115,7 +115,7 @@ export default function DeveloperDashboardPage() {
 
   React.useEffect(() => {
     fetchAllData();
-    const interval = setInterval(fetchAllData, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchAllData, 30000); 
     return () => clearInterval(interval);
   }, [fetchAllData]);
 
@@ -126,7 +126,7 @@ export default function DeveloperDashboardPage() {
     try {
       await approveInvestmentInFirestore(submissionId);
       toast({ title: 'Investment Approved', description: `Investment ID ${submissionId} marked as approved.` });
-      fetchAllData(); // Refresh data
+      fetchAllData(); 
     } catch (error) {
       console.error('Approval error:', error);
       toast({ title: 'Approval Failed', description: `Could not approve investment ${submissionId}.`, variant: 'destructive' });
@@ -151,7 +151,7 @@ export default function DeveloperDashboardPage() {
     try {
       await rejectInvestmentInFirestore(submissionId, investmentRejectionReason.trim());
       toast({ title: 'Investment Rejected', description: `Investment ID ${submissionId} marked as rejected.`, variant: 'destructive' });
-      fetchAllData(); // Refresh data
+      fetchAllData(); 
       setIsRejectionModalOpen(false);
       setCurrentInvestmentToReject(null);
     } catch (error) {
@@ -165,8 +165,8 @@ export default function DeveloperDashboardPage() {
 
   const openWithdrawalActionModal = (type: 'complete' | 'reject', request: WithdrawalRequestFirestore) => {
       setWithdrawalAction({ type, request });
-      setTransactionId(''); 
-      setRejectionReason('');
+      setTransactionIdInput(''); 
+      setRejectionReasonInput('');
   }
 
   const closeWithdrawalActionModal = () => {
@@ -174,14 +174,14 @@ export default function DeveloperDashboardPage() {
   }
 
   const handleCompleteWithdrawal = async () => {
-      if (!withdrawalAction.request || !transactionId.trim()) {
+      if (!withdrawalAction.request || !transactionIdInput.trim()) {
           toast({ title: "Missing Transaction ID", description: "Please enter the payment transaction ID.", variant: "destructive" });
           return;
       }
       const requestId = withdrawalAction.request.id!;
       setIsProcessingWithdrawal((prev) => ({ ...prev, [requestId]: true }));
       try {
-          await updateWithdrawalStatus(requestId, 'completed', { transactionId: transactionId.trim() }); // Placeholder
+          await updateWithdrawalStatusInFirestore(requestId, 'completed', { transactionId: transactionIdInput.trim() });
           toast({ title: 'Withdrawal Completed', description: `Withdrawal ${requestId} marked as completed.` });
           fetchAllData();
           closeWithdrawalActionModal();
@@ -194,14 +194,14 @@ export default function DeveloperDashboardPage() {
   };
 
    const handleRejectWithdrawal = async () => {
-       if (!withdrawalAction.request || !rejectionReason.trim()) {
+       if (!withdrawalAction.request || !rejectionReasonInput.trim()) {
            toast({ title: "Missing Rejection Reason", description: "Please provide a reason for rejection.", variant: "destructive" });
            return;
        }
        const requestId = withdrawalAction.request.id!;
        setIsProcessingWithdrawal((prev) => ({ ...prev, [requestId]: true }));
        try {
-           await updateWithdrawalStatus(requestId, 'rejected', { rejectionReason: rejectionReason.trim() }); // Placeholder
+           await updateWithdrawalStatusInFirestore(requestId, 'rejected', { rejectionReason: rejectionReasonInput.trim() }); 
            toast({ title: 'Withdrawal Rejected', description: `Withdrawal ${requestId} has been rejected.`, variant: 'destructive' });
            fetchAllData();
            closeWithdrawalActionModal();
@@ -218,8 +218,8 @@ export default function DeveloperDashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="mb-8 text-3xl font-bold tracking-tight text-center text-primary">
-        Developer Dashboard
+      <h1 className="mb-8 text-3xl font-bold tracking-tight text-center text-primary flex items-center justify-center gap-2">
+        <WalletCards className="h-8 w-8"/> Developer Dashboard
       </h1>
 
       <Tabs defaultValue="pending-investments" className="w-full">
@@ -337,17 +337,18 @@ export default function DeveloperDashboardPage() {
                                       <TableHead>Approved On</TableHead>
                                       <TableHead>Ends On</TableHead>
                                       <TableHead>Status</TableHead>
+                                      <TableHead className="text-center">Proof</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
                                   {activeInvestments.map((investment) => {
                                       const startDate = investment.approvalDate ? (investment.approvalDate as Timestamp).toDate() : new Date();
                                       const endDate = addDays(startDate, investment.duration);
-                                      const isPlanComplete = investment.status === 'completed' || (investment.status === 'approved' && isPast(endDate));
+                                      const isPlanConsideredComplete = investment.status === 'completed' || (investment.status === 'approved' && isPast(endDate));
                                       
                                       let displayStatus = investment.status.charAt(0).toUpperCase() + investment.status.slice(1);
                                       if (investment.status === 'approved' && isPast(endDate) && investment.status !== 'completed') {
-                                        displayStatus = "Ended (Awaiting Withdrawal)"; // Or similar
+                                        displayStatus = "Ended (Awaiting Withdrawal)"; 
                                       }
 
 
@@ -362,10 +363,23 @@ export default function DeveloperDashboardPage() {
                                               <TableCell>{formatFirestoreTimestamp(investment.approvalDate)}</TableCell>
                                               <TableCell>{format(endDate, 'P')}</TableCell>
                                               <TableCell>
-                                                  <Badge variant={isPlanComplete ? "secondary" : (investment.status === 'approved' ? "default" : "outline")}>
+                                                  <Badge variant={isPlanConsideredComplete ? "secondary" : (investment.status === 'approved' ? "default" : (investment.status === 'rejected' ? "destructive" : "outline"))}>
                                                       {displayStatus}
                                                   </Badge>
                                               </TableCell>
+                                               <TableCell className="text-center">
+                                                {investment.transactionProofUrl ? (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => openImageModal(investment.transactionProofUrl)}
+                                                    >
+                                                        <ExternalLink className="mr-1 h-4 w-4" /> View
+                                                    </Button>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">N/A</span>
+                                                )}
+                                            </TableCell>
                                           </TableRow>
                                       );
                                   })}
@@ -380,7 +394,7 @@ export default function DeveloperDashboardPage() {
                <Card>
                   <CardHeader>
                       <CardTitle>Review Withdrawal Requests</CardTitle>
-                      <CardDescription>Mark pending withdrawal requests as completed or rejected.</CardDescription>
+                      <CardDescription>Mark pending withdrawal requests from Firestore as completed or rejected.</CardDescription>
                   </CardHeader>
                   <CardContent>
                       {isLoadingWithdrawals ? (
@@ -411,12 +425,12 @@ export default function DeveloperDashboardPage() {
                                           </TableCell>
                                           <TableCell>
                                                 <div>{request.investmentTitle}</div>
-                                                <div className="text-xs text-muted-foreground">{request.investmentId}</div>
+                                                <div className="text-xs text-muted-foreground">ID: {request.investmentId.substring(0,10)}...</div>
                                           </TableCell>
                                           <TableCell className="text-right font-medium">{formatCurrency(request.withdrawalAmount)}</TableCell>
                                           <TableCell className="capitalize">{request.paymentMethod}</TableCell>
                                           <TableCell>{request.accountNumber}</TableCell>
-                                          <TableCell>{formatFirestoreTimestamp(request.requestDate as unknown as Timestamp)}</TableCell>
+                                          <TableCell>{formatFirestoreTimestamp(request.requestDate)}</TableCell>
                                           <TableCell className="text-center space-x-2">
                                               <Button
                                                   variant="default"
@@ -470,7 +484,6 @@ export default function DeveloperDashboardPage() {
                 fill 
                 style={{ objectFit: 'contain' }} 
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                unoptimized // Add this if images are from Firebase Storage and not on a whitelisted domain
               />
             )}
           </div>
@@ -478,8 +491,8 @@ export default function DeveloperDashboardPage() {
              {selectedImage && (
                 <a
                     href={selectedImage}
-                    download={`transaction_proof_${Date.now()}.png`} // Consider more specific naming
-                    target="_blank" // Open in new tab to download
+                    download={`transaction_proof_${Date.now()}.png`} 
+                    target="_blank" 
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3"
                 >
@@ -537,8 +550,8 @@ export default function DeveloperDashboardPage() {
                     </DialogTitle>
                     <DialogDescription>
                         {withdrawalAction.type === 'complete'
-                            ? `Confirm completion for withdrawal request ${withdrawalAction.request?.id}.`
-                            : `Provide a reason for rejecting withdrawal request ${withdrawalAction.request?.id}.`}
+                            ? `Confirm completion for withdrawal request ID ${withdrawalAction.request?.id?.substring(0,10)}... for ${withdrawalAction.request?.userName}.`
+                            : `Provide a reason for rejecting withdrawal request ID ${withdrawalAction.request?.id?.substring(0,10)}... for ${withdrawalAction.request?.userName}.`}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -546,9 +559,9 @@ export default function DeveloperDashboardPage() {
                         <div className="space-y-2">
                             <Label htmlFor="transaction-id">Transaction ID</Label>
                             <Input
-                                id="transaction-id"
-                                value={transactionId}
-                                onChange={(e) => setTransactionId(e.target.value)}
+                                id="transaction-id-input" // Changed ID
+                                value={transactionIdInput}
+                                onChange={(e) => setTransactionIdInput(e.target.value)}
                                 placeholder="Enter payment transaction ID"
                                 required
                             />
@@ -559,14 +572,24 @@ export default function DeveloperDashboardPage() {
                         <div className="space-y-2">
                             <Label htmlFor="rejection-reason">Rejection Reason</Label>
                              <Textarea
-                                id="rejection-reason"
-                                value={rejectionReason}
-                                onChange={(e) => setRejectionReason(e.target.value)}
+                                id="rejection-reason-input" // Changed ID
+                                value={rejectionReasonInput}
+                                onChange={(e) => setRejectionReasonInput(e.target.value)}
                                 placeholder="Enter reason for rejection (e.g., invalid account number, suspected fraud)"
                                 required
                                 rows={3}
                             />
                         </div>
+                    )}
+                     {withdrawalAction.request && (
+                        <Card className="p-3 bg-muted/50">
+                            <CardDescription className="text-xs space-y-0.5">
+                                <p><strong>User:</strong> {withdrawalAction.request.userName} ({withdrawalAction.request.userPhoneNumber})</p>
+                                <p><strong>Amount:</strong> {formatCurrency(withdrawalAction.request.withdrawalAmount)}</p>
+                                <p><strong>Method:</strong> {withdrawalAction.request.paymentMethod} - {withdrawalAction.request.accountNumber}</p>
+                                <p><strong>Investment:</strong> {withdrawalAction.request.investmentTitle}</p>
+                            </CardDescription>
+                        </Card>
                     )}
                 </div>
                 <DialogFooter>
@@ -576,7 +599,7 @@ export default function DeveloperDashboardPage() {
                     {withdrawalAction.type === 'complete' && (
                         <Button
                             onClick={handleCompleteWithdrawal}
-                            disabled={isProcessingWithdrawal[withdrawalAction.request?.id ?? ''] || !transactionId.trim()}
+                            disabled={isProcessingWithdrawal[withdrawalAction.request?.id ?? ''] || !transactionIdInput.trim()}
                              className="bg-green-600 hover:bg-green-700"
                          >
                             {isProcessingWithdrawal[withdrawalAction.request?.id ?? ''] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -587,7 +610,7 @@ export default function DeveloperDashboardPage() {
                         <Button
                             variant="destructive"
                             onClick={handleRejectWithdrawal}
-                            disabled={isProcessingWithdrawal[withdrawalAction.request?.id ?? ''] || !rejectionReason.trim()}
+                            disabled={isProcessingWithdrawal[withdrawalAction.request?.id ?? ''] || !rejectionReasonInput.trim()}
                         >
                              {isProcessingWithdrawal[withdrawalAction.request?.id ?? ''] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Confirm Rejection
@@ -599,4 +622,3 @@ export default function DeveloperDashboardPage() {
     </div>
   );
 }
-
