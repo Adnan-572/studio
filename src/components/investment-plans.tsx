@@ -94,22 +94,6 @@ export const plansData: Plan[] = [
   },
 ];
 
-
-const paymentAccountDetails = {
-  easypaisa: {
-    accountName: "Adnan Tariq",
-    accountNumber: "03411167577",
-  },
-  jazzcash: {
-    accountName: "Rupay Growth Investment", 
-    accountNumber: "03012345678", 
-  },
-  sadapay: {
-    accountName: "Rupay Growth",
-    accountNumber: "03121145736", // Example
-  }
-};
-
 const formatCurrency = (amount: number) => {
   if (!Number.isFinite(amount)) {
     return 'PKR 0.00';
@@ -237,16 +221,6 @@ export function InvestmentPlans({ isAuthenticated }: InvestmentPlansProps) {
     }
   };
   
-  const copyToClipboard = (text: string, fieldName: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({ title: "Copied!", description: `${fieldName} copied to clipboard.`, variant: "default", duration: 2000 });
-    }).catch(err => {
-      console.error(`Failed to copy ${fieldName}: `, err);
-      toast({ title: "Error", description: `Failed to copy ${fieldName}.`, variant: "destructive" });
-    });
-  };
-
-
   return (
     <>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -306,24 +280,7 @@ export function InvestmentPlans({ isAuthenticated }: InvestmentPlansProps) {
                 <CardTitle className="text-lg">Payment & Withdrawal Terms</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-3">
-                <div>
-                   <h4 className="font-semibold mb-1">Payment Accounts (For Investment):</h4>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {Object.entries(paymentAccountDetails).map(([key, detail]) => (
-                            <Card key={key} className="bg-muted/50 p-3">
-                                <CardTitle className="text-base font-medium mb-1 capitalize">{key}</CardTitle>
-                                <p>Name: <span className="font-medium">{detail.accountName}</span></p>
-                                <div className="flex items-center gap-1">
-                                    <p>Number: <span className="font-mono">{detail.accountNumber}</span></p>
-                                    <Button type="button" variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyToClipboard(detail.accountNumber, `${key} Number`)}>
-                                        <Copy className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            </Card>
-                        ))}
-                   </div>
-                </div>
-                 <Separator className="my-3"/>
+                {/* Payment account details are now shown on the submit-proof page */}
                 <p>✅ Profits and principal (capital) are credited back at the end of the chosen plan's duration.</p>
                 <p>✅ Withdrawals can be requested via Easypaisa or JazzCash once the plan is complete.</p>
                 <p>❗ Please note: Early withdrawal is not available. Funds are locked for the entire duration of the investment plan.</p>
@@ -333,3 +290,5 @@ export function InvestmentPlans({ isAuthenticated }: InvestmentPlansProps) {
     </>
   );
 }
+
+    
