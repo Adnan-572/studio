@@ -13,47 +13,37 @@ import {
   addDoc,
   collectionGroup,
   writeBatch,
-  getDoc // Added getDoc
+  getDoc,
+  runTransaction
 } from 'firebase/firestore';
+import type { UserProfile } from '@/contexts/auth-context'; // Import UserProfile
 
 export interface UserPlanData {
-  id?: string; // Firestore document ID of the plan investment itself
-
-  // Denormalized user info for admin convenience & record keeping
+  id?: string; 
   userId: string;
-  userName: string; // Name used at the time of this specific investment
-  userPhoneNumber: string; // Phone number used at the time of this specific investment
-
-  // Plan details chosen by user / submitted
-  planDefId: string; // From PlanUIDetails (e.g., "plan_basic_15d"), to link back to static plan definitions
-  planTitle: string; // From PlanUIDetails (e.g., "Basic Plan")
+  userName: string; 
+  userPhoneNumber: string; 
+  planDefId: string; 
+  planTitle: string; 
   investmentAmount: number;
   transactionProofUrl: string;
   submissionDate: Timestamp;
-
-  // Details from the core plan definition (from PlanUIDetails), stored at submission time
-  // This "freezes" the plan terms for this specific investment
   baseDailyProfitMin: number; 
   baseDailyProfitMax: number; 
   durationInDays: number; 
   planIconName: string; 
-
-  // Status and operational fields
   status: 'pending' | 'approved' | 'rejected' | 'completed';
   approvalDate?: Timestamp | null;
   rejectionReason?: string | null;
-  endDate?: Timestamp | null; // Calculated upon approval: approvalDate + durationInDays
-  
-  referralBonusAppliedPercent?: number; // If any referral bonus is active for this investment
+  endDate?: Timestamp | null; 
+  referralBonusAppliedPercent: number; // Changed: Ensure this is not optional, default to 0
 }
 
-
-// Adds a new investment proof/submission to the user's 'plans' subcollection
 export const addInvestmentProofToUserPlans = async (
   userId: string,
-  userName: string, // Current user's name
-  userPhoneNumber: string, // Current user's phone
-  planDetails: PlanUIDetails, // The chosen plan from UI
+  userName: string, 
+  userPhoneNumber: string, 
+  planDetails: PlanUIDetails, 
   investmentAmount: number,
   transactionProofUrl: string
 ): Promise<UserPlanData> => {
@@ -81,7 +71,7 @@ export const addInvestmentProofToUserPlans = async (
       approvalDate: null,
       rejectionReason: null,
       endDate: null,
-      referralBonusAppliedPercent: 0, // TODO: Implement referral bonus logic if needed
+      referralBonusAppliedPercent: 0, // Default to 0
     };
 
     const docRef = await addDoc(userPlansCollectionRef, newPlanData);
@@ -93,7 +83,6 @@ export const addInvestmentProofToUserPlans = async (
   }
 };
 
-// Fetches all investment plans for a specific user
 export const getUserPlans = async (userId: string): Promise<UserPlanData[]> => {
   if (!db) {
     console.error("Firestore not initialized for getUserPlans");
@@ -105,7 +94,13 @@ export const getUserPlans = async (userId: string): Promise<UserPlanData[]> => {
     const querySnapshot = await getDocs(q);
     const plans: UserPlanData[] = [];
     querySnapshot.forEach((doc) => {
-      plans.push({ id: doc.id, ...doc.data() } as UserPlanData);
+      const data = doc.data();
+      plans.push({ 
+        id: doc.id, 
+        ...data,
+        // Ensure referralBonusAppliedPercent has a default if missing from old data
+        referralBonusAppliedPercent: data.referralBonusAppliedPercent ?? 0,
+      } as UserPlanData);
     });
     return plans;
   } catch (error) {
@@ -114,8 +109,6 @@ export const getUserPlans = async (userId: string): Promise<UserPlanData[]> => {
   }
 };
 
-// Fetches all submitted plans from all users for the admin dashboard
-// Uses a collection group query
 export const getAllSubmittedPlansForAdmin = async (): Promise<UserPlanData[]> => {
   if (!db) {
     console.error("Firestore not initialized for getAllSubmittedPlansForAdmin");
@@ -123,14 +116,16 @@ export const getAllSubmittedPlansForAdmin = async (): Promise<UserPlanData[]> =>
   }
   try {
     const plansGroupRef = collectionGroup(db, 'plans');
-    // Order by submission date globally. You might add more complex ordering or filtering.
     const q = query(plansGroupRef, orderBy('submissionDate', 'desc'));
     const querySnapshot = await getDocs(q);
     const allPlans: UserPlanData[] = [];
     querySnapshot.forEach((doc) => {
-      // doc.ref.parent.parent.id gives the userId
-      // but we should have userId already in the document due to denormalization
-      allPlans.push({ id: doc.id, ...doc.data() } as UserPlanData);
+      const data = doc.data();
+      allPlans.push({ 
+        id: doc.id, 
+        ...data,
+        referralBonusAppliedPercent: data.referralBonusAppliedPercent ?? 0,
+      } as UserPlanData);
     });
     return allPlans;
   } catch (error) {
@@ -139,40 +134,85 @@ export const getAllSubmittedPlansForAdmin = async (): Promise<UserPlanData[]> =>
   }
 };
 
-// Approves a submitted plan for a user
-export const approveSubmittedPlan = async (userId: string, planInvestmentId: string): Promise<void> => {
+export const approveSubmittedPlan = async (userIdOfPlanOwner: string, planInvestmentId: string): Promise<void> => {
   if (!db) {
     console.error("Firestore not initialized for approveSubmittedPlan");
     throw new Error("Firestore not initialized");
   }
+  
+  const planDocRef = doc(db, "users", userIdOfPlanOwner, "plans", planInvestmentId);
+  
   try {
-    const planDocRef = doc(db, "users", userId, "plans", planInvestmentId);
-    const planDocSnap = await getDoc(planDocRef); // Changed to use getDoc
-    
-    if (!planDocSnap.exists()) { // Simpler check for document existence
-        throw new Error(`Plan document ${planInvestmentId} not found for user ${userId}`);
-    }
-    const planData = planDocSnap.data() as UserPlanData; // Get data directly
+    await runTransaction(db, async (transaction) => {
+      const planDocSnap = await transaction.get(planDocRef);
+      if (!planDocSnap.exists()) {
+        throw new Error(`Plan document ${planInvestmentId} not found for user ${userIdOfPlanOwner}`);
+      }
+      const planData = planDocSnap.data() as UserPlanData;
 
-    const approvalTime = Timestamp.now();
-    const planEndDate = new Timestamp(
-        approvalTime.seconds + (planData.durationInDays * 24 * 60 * 60),
-        approvalTime.nanoseconds
-    );
+      const approvalTime = Timestamp.now();
+      const planEndDate = new Timestamp(
+          approvalTime.seconds + (planData.durationInDays * 24 * 60 * 60),
+          approvalTime.nanoseconds
+      );
 
-    await updateDoc(planDocRef, {
-      status: 'approved',
-      approvalDate: approvalTime,
-      endDate: planEndDate,
-      rejectionReason: null,
+      transaction.update(planDocRef, {
+        status: 'approved',
+        approvalDate: approvalTime,
+        endDate: planEndDate,
+        rejectionReason: null,
+      });
+
+      // --- Referral Bonus Logic ---
+      // Check if the plan owner (userIdOfPlanOwner) was referred by someone
+      const planOwnerProfileRef = doc(db, "users", userIdOfPlanOwner);
+      const planOwnerProfileSnap = await transaction.get(planOwnerProfileRef);
+
+      if (planOwnerProfileSnap.exists()) {
+        const planOwnerProfile = planOwnerProfileSnap.data() as UserProfile;
+        const referrerUserId = planOwnerProfile.referredByUserId;
+
+        if (referrerUserId) {
+          // The plan owner was referred. Now, find an active plan of the referrer.
+          const referrerPlansCollectionRef = collection(db, "users", referrerUserId, "plans");
+          const activeReferrerPlansQuery = query(
+            referrerPlansCollectionRef,
+            where("status", "==", "approved"), // Only 'approved' plans can receive bonus
+            orderBy("approvalDate", "asc"), // Apply to oldest active plan first, or any one.
+            // limit(1) // If bonus applies to only one plan
+          );
+          
+          const activeReferrerPlansSnap = await getDocs(activeReferrerPlansQuery); // Use getDocs directly, not in transaction for reads if possible
+
+          if (!activeReferrerPlansSnap.empty) {
+            // For simplicity, apply to the first active plan found.
+            // Could be enhanced to choose a specific plan or apply to all.
+            activeReferrerPlansSnap.forEach(referrerPlanDoc => {
+                const referrerPlanRef = doc(db, "users", referrerUserId, "plans", referrerPlanDoc.id);
+                const currentBonus = referrerPlanDoc.data().referralBonusAppliedPercent ?? 0;
+                // Add 1% bonus. Consider if there's a cap or if it's additive.
+                const newBonus = currentBonus + 1; 
+                
+                transaction.update(referrerPlanRef, {
+                    referralBonusAppliedPercent: newBonus
+                });
+                console.log(`Applied 1% referral bonus to plan ${referrerPlanDoc.id} for referrer ${referrerUserId}. New bonus: ${newBonus}%`);
+            });
+          } else {
+            console.log(`Referrer ${referrerUserId} has no active plans to apply bonus to.`);
+          }
+        }
+      } else {
+        console.warn(`User profile for ${userIdOfPlanOwner} not found. Cannot check for referral.`);
+      }
     });
+    console.log(`Plan ${planInvestmentId} for user ${userIdOfPlanOwner} approved and referral check completed.`);
   } catch (error) {
-    console.error(`Error approving plan ${planInvestmentId} for user ${userId}:`, error);
+    console.error(`Error in transaction for approving plan ${planInvestmentId} for user ${userIdOfPlanOwner}:`, error);
     throw error;
   }
 };
 
-// Rejects a submitted plan for a user
 export const rejectSubmittedPlan = async (userId: string, planInvestmentId: string, reason: string): Promise<void> => {
   if (!db) {
     console.error("Firestore not initialized for rejectSubmittedPlan");
@@ -192,10 +232,6 @@ export const rejectSubmittedPlan = async (userId: string, planInvestmentId: stri
   }
 };
 
-// Marks an approved plan as "completed"
-// This might be triggered by a cron job checking endDates or manually by an admin if needed.
-// For now, the user dashboard can derive "completed" status if current date > endDate.
-// Explicitly setting it can be useful for archival or specific triggers.
 export const completeUserPlan = async (userId: string, planInvestmentId: string): Promise<void> => {
     if (!db) {
         console.error("Firestore not initialized for completeUserPlan");
@@ -205,7 +241,6 @@ export const completeUserPlan = async (userId: string, planInvestmentId: string)
         const planDocRef = doc(db, "users", userId, "plans", planInvestmentId);
         await updateDoc(planDocRef, {
             status: 'completed',
-            // completionDate: Timestamp.now() // Optional: if you want to record exact completion time
         });
     } catch (error) {
         console.error(`Error completing plan ${planInvestmentId} for user ${userId}:`, error);
@@ -214,36 +249,32 @@ export const completeUserPlan = async (userId: string, planInvestmentId: string)
 };
 
 
-// --- The following are original top-level investment functions, kept for reference ---
-// --- or if any part of the app might still call them TEMPORARILY. ---
-// --- NEW CODE SHOULD USE THE USER-CENTRIC FUNCTIONS ABOVE. ---
-
+// Legacy functions (kept for reference, should be phased out)
 export interface InvestmentSubmissionFirestore {
     id?: string; 
     userId: string; 
     userName: string; 
     userPhoneNumber: string; 
-    planId: string; // This was the PlanUIDetails.id
+    planId: string; 
     planTitle: string;
     investmentAmount: number; 
-    minInvestment: number; // from PlanUIDetails
-    maxInvestment: number; // from PlanUIDetails
-    dailyProfitMin: number; // from PlanUIDetails
-    dailyProfitMax: number; // from PlanUIDetails
-    duration: number; // from PlanUIDetails
-    iconName: string; // from PlanUIDetails
+    minInvestment: number; 
+    maxInvestment: number; 
+    dailyProfitMin: number; 
+    dailyProfitMax: number; 
+    duration: number; 
+    iconName: string; 
     transactionProofUrl: string; 
     submissionDate: Timestamp; 
     status: 'pending' | 'approved' | 'rejected' | 'completed';
     approvalDate?: Timestamp | null; 
     rejectionReason?: string | null;
     completionDate?: Timestamp | null; 
-    referralBonusPercent?: number;
+    referralBonusPercent?: number; // This was on the old model
 }
-
+// ... (other legacy functions remain unchanged but should be reviewed for removal/refactoring)
 export const getPendingInvestmentsFromFirestore = async (): Promise<InvestmentSubmissionFirestore[]> => {
   console.warn("Legacy getPendingInvestmentsFromFirestore called. Use getAllSubmittedPlansForAdmin and filter by status.");
-  // Simulate by fetching all plans and filtering, then adapting to old structure
   const allUserPlans = await getAllSubmittedPlansForAdmin();
   return allUserPlans
     .filter(p => p.status === 'pending')
@@ -255,8 +286,8 @@ export const getPendingInvestmentsFromFirestore = async (): Promise<InvestmentSu
         planId: p.planDefId,
         planTitle: p.planTitle,
         investmentAmount: p.investmentAmount,
-        minInvestment: 0, // Placeholder - old structure had this
-        maxInvestment: 0, // Placeholder
+        minInvestment: 0, 
+        maxInvestment: 0, 
         dailyProfitMin: p.baseDailyProfitMin,
         dailyProfitMax: p.baseDailyProfitMax,
         duration: p.durationInDays,
@@ -266,6 +297,7 @@ export const getPendingInvestmentsFromFirestore = async (): Promise<InvestmentSu
         status: p.status,
         approvalDate: p.approvalDate,
         rejectionReason: p.rejectionReason,
+        referralBonusPercent: p.referralBonusAppliedPercent, // map new field to old
     } as InvestmentSubmissionFirestore));
 };
 
@@ -282,8 +314,8 @@ export const getApprovedInvestmentsFromFirestore = async (): Promise<InvestmentS
         planId: p.planDefId,
         planTitle: p.planTitle,
         investmentAmount: p.investmentAmount,
-        minInvestment: 0, // Placeholder
-        maxInvestment: 0, // Placeholder
+        minInvestment: 0, 
+        maxInvestment: 0, 
         dailyProfitMin: p.baseDailyProfitMin,
         dailyProfitMax: p.baseDailyProfitMax,
         duration: p.durationInDays,
@@ -293,6 +325,7 @@ export const getApprovedInvestmentsFromFirestore = async (): Promise<InvestmentS
         status: p.status,
         approvalDate: p.approvalDate,
         rejectionReason: p.rejectionReason,
+        referralBonusPercent: p.referralBonusAppliedPercent,
     } as InvestmentSubmissionFirestore));
 };
 
@@ -300,7 +333,7 @@ export const getActiveInvestmentsForUserFromFirestore = async (userId: string): 
   console.warn("Legacy getActiveInvestmentsForUserFromFirestore called. Use getUserPlans and adapt.");
   const userPlans = await getUserPlans(userId);
   return userPlans
-    .filter(p => p.status === 'approved' || p.status === 'completed' || p.status === 'pending') // User dashboard shows pending too
+    .filter(p => p.status === 'approved' || p.status === 'completed' || p.status === 'pending') 
     .map(p => ({
         id: p.id,
         userId: p.userId,
@@ -309,8 +342,8 @@ export const getActiveInvestmentsForUserFromFirestore = async (userId: string): 
         planId: p.planDefId,
         planTitle: p.planTitle,
         investmentAmount: p.investmentAmount,
-        minInvestment: 0, // Placeholder
-        maxInvestment: 0, // Placeholder
+        minInvestment: 0, 
+        maxInvestment: 0, 
         dailyProfitMin: p.baseDailyProfitMin,
         dailyProfitMax: p.baseDailyProfitMax,
         duration: p.durationInDays,
@@ -320,16 +353,13 @@ export const getActiveInvestmentsForUserFromFirestore = async (userId: string): 
         status: p.status,
         approvalDate: p.approvalDate,
         rejectionReason: p.rejectionReason,
-         // Map durationInDays to duration for compatibility with UserInvestmentDashboard
+        referralBonusPercent: p.referralBonusAppliedPercent,
     } as InvestmentSubmissionFirestore));
 };
 
 
 export const approveInvestmentInFirestore = async (submissionId: string): Promise<void> => {
   console.warn(`Legacy approveInvestmentInFirestore(${submissionId}) called. This ID is now relative to a subcollection. Refactor call site.`);
-  // This function is problematic because submissionId was a top-level ID.
-  // The caller needs to provide userId and the planInvestmentId (which was submissionId).
-  // For now, this will likely fail or do nothing.
   throw new Error("Legacy approveInvestmentInFirestore called with top-level ID. Requires refactoring to provide userId and planInvestmentId.");
 };
 
@@ -337,7 +367,3 @@ export const rejectInvestmentInFirestore = async (submissionId: string, reason: 
   console.warn(`Legacy rejectInvestmentInFirestore(${submissionId}) called. This ID is now relative to a subcollection. Refactor call site.`);
   throw new Error("Legacy rejectInvestmentInFirestore called with top-level ID. Requires refactoring to provide userId and planInvestmentId.");
 };
-
-    
-
-    

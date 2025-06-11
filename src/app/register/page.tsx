@@ -6,12 +6,14 @@ import { AuthForm } from '@/components/auth-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 export default function RegisterPage() {
   const { currentUser, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const referralCodeFromUrl = searchParams.get('ref');
 
   React.useEffect(() => {
     if (!loading && currentUser) {
@@ -36,13 +38,18 @@ export default function RegisterPage() {
           <CardDescription>Join Rupay Growth and start investing today.</CardDescription>
         </CardHeader>
         <CardContent>
-          <AuthForm mode="register" />
+          <AuthForm mode="register" initialReferralCode={referralCodeFromUrl || undefined} />
            <p className="mt-6 text-center text-sm">
             Already have an account?{' '}
             <Link href="/login" className="font-medium text-primary hover:underline">
               Login here
             </Link>
           </p>
+           {referralCodeFromUrl && (
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              Referred by: {referralCodeFromUrl.substring(0,10)}...
+            </p>
+           )}
         </CardContent>
       </Card>
     </div>
