@@ -1,14 +1,14 @@
 
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, Timestamp, addDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, Timestamp, addDoc, orderBy, limit } from 'firebase/firestore';
 
 export interface WithdrawalRequestFirestore {
     id?: string; 
     userId: string; 
-    userName: string; 
-    userPhoneNumber: string;
-    investmentId: string; 
-    investmentTitle: string; 
+    userName: string; // Denormalized for admin convenience
+    userPhoneNumber: string; // Denormalized for admin convenience
+    investmentId: string; // ID of the UserPlanData document this withdrawal is for
+    investmentTitle: string; // Denormalized from UserPlanData
     withdrawalAmount: number; 
     paymentMethod: 'easypaisa' | 'jazzcash';
     accountNumber: string; 
@@ -22,7 +22,7 @@ export interface WithdrawalRequestFirestore {
 // For User Dashboard: Fetches withdrawal request for a specific completed investment
 export const getWithdrawalRequestForInvestmentFromFirestore = async (investmentId: string, userId: string): Promise<WithdrawalRequestFirestore | null> => {
   if (!db) {
-    console.error("Firestore not initialized");
+    console.error("Firestore not initialized for getWithdrawalRequestForInvestmentFromFirestore");
     return null;
   }
   try {
@@ -30,18 +30,17 @@ export const getWithdrawalRequestForInvestmentFromFirestore = async (investmentI
       collection(db, "withdrawals"), 
       where("investmentId", "==", investmentId),
       where("userId", "==", userId),
-      orderBy("requestDate", "desc"), // Get the latest request if multiple somehow exist
-      // limit(1) // if you only ever expect one
+      orderBy("requestDate", "desc"), 
+      limit(1) // Assuming only one active/pending request per investment
     );
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
-      // Assuming one withdrawal request per investment for a user. If multiple, take the first.
       const docData = querySnapshot.docs[0].data();
       return { id: querySnapshot.docs[0].id, ...docData } as WithdrawalRequestFirestore;
     }
     return null;
   } catch (error) {
-    console.error("Error fetching withdrawal request for investment: ", error);
+    console.error(`Error fetching withdrawal request for investment ${investmentId}, user ${userId}: `, error);
     return null;
   }
 };
@@ -49,7 +48,7 @@ export const getWithdrawalRequestForInvestmentFromFirestore = async (investmentI
 // For User Dashboard: Adds a new withdrawal request
 export const addWithdrawalRequestToFirestore = async (request: Omit<WithdrawalRequestFirestore, 'id' | 'status' | 'requestDate' | 'processedDate' | 'rejectionReason' | 'transactionId'>): Promise<WithdrawalRequestFirestore> => {
   if (!db) {
-    console.error("Firestore not initialized");
+    console.error("Firestore not initialized for addWithdrawalRequestToFirestore");
     throw new Error("Firestore not initialized");
   }
   try {
@@ -72,15 +71,15 @@ export const addWithdrawalRequestToFirestore = async (request: Omit<WithdrawalRe
 // For Developer Dashboard: Fetches all pending withdrawal requests
 export const getPendingWithdrawalRequestsFromFirestore = async (): Promise<WithdrawalRequestFirestore[]> => {
   if (!db) {
-    console.error("Firestore not initialized");
+    console.error("Firestore not initialized for getPendingWithdrawalRequestsFromFirestore");
     return [];
   }
   try {
     const q = query(collection(db, "withdrawals"), where("status", "==", "pending"), orderBy("requestDate", "asc"));
     const querySnapshot = await getDocs(q);
     const requests: WithdrawalRequestFirestore[] = [];
-    querySnapshot.forEach((doc) => {
-      requests.push({ id: doc.id, ...doc.data() } as WithdrawalRequestFirestore);
+    querySnapshot.forEach((docSnap) => {
+      requests.push({ id: docSnap.id, ...docSnap.data() } as WithdrawalRequestFirestore);
     });
     return requests;
   } catch (error) {
@@ -96,7 +95,7 @@ export const updateWithdrawalStatusInFirestore = async (
   details: { transactionId?: string; rejectionReason?: string }
 ): Promise<void> => {
   if (!db) {
-    console.error("Firestore not initialized");
+    console.error("Firestore not initialized for updateWithdrawalStatusInFirestore");
     throw new Error("Firestore not initialized");
   }
   try {
@@ -107,51 +106,15 @@ export const updateWithdrawalStatusInFirestore = async (
     };
     if (status === 'completed' && details.transactionId) {
       updateData.transactionId = details.transactionId;
-      updateData.rejectionReason = null;
+      updateData.rejectionReason = null; // Clear rejection reason if completing
     }
     if (status === 'rejected' && details.rejectionReason) {
       updateData.rejectionReason = details.rejectionReason;
-      updateData.transactionId = null;
+      updateData.transactionId = null; // Clear transaction ID if rejecting
     }
     await updateDoc(requestRef, updateData);
   } catch (error) {
-    console.error("Error updating withdrawal status: ", error);
+    console.error(`Error updating withdrawal status for request ${requestId}: `, error);
     throw error;
   }
-};
-
-
-// --- Placeholder functions kept for compatibility during transition if any part still uses them ---
-// --- These should ideally be removed once full Firestore migration is confirmed stable ---
-
-export const getPendingWithdrawalRequests = (): WithdrawalRequestFirestore[] => {
-  console.warn("Legacy getPendingWithdrawalRequests (non-Firestore) called. Use getPendingWithdrawalRequestsFromFirestore.");
-  return []; // Return empty or fetch from a mock if needed during transition
-};
-
-export const updateWithdrawalStatus = async (
-    requestId: string,
-    status: 'completed' | 'rejected',
-    details: { transactionId?: string; rejectionReason?: string }
-): Promise<void> => {
-    console.warn(`Legacy updateWithdrawalStatus(${requestId}, ${status}) (non-Firestore) called. Use updateWithdrawalStatusInFirestore.`);
-    // Mock successful promise
-    return Promise.resolve();
-};
-
-export const addWithdrawalRequest = async (request: Omit<WithdrawalRequestFirestore, 'id' | 'status' | 'requestDate' | 'processedDate' | 'rejectionReason' | 'transactionId' >): Promise<WithdrawalRequestFirestore> => {
-    console.warn("Legacy addWithdrawalRequest (non-Firestore) called. Use addWithdrawalRequestToFirestore.");
-    // Return a mock request
-    const newRequest: WithdrawalRequestFirestore = {
-        ...request,
-        id: `temp_wd_${Date.now()}`,
-        status: 'pending',
-        requestDate: Timestamp.now(), // Or new Date().toISOString() if previous type was string
-    };
-    return Promise.resolve(newRequest);
-};
-
-export const getWithdrawalRequestForInvestment = (investmentId: string, userId?: string): WithdrawalRequestFirestore | null => {
-    console.warn(`Legacy getWithdrawalRequestForInvestment(${investmentId}, ${userId}) (non-Firestore) called. Use getWithdrawalRequestForInvestmentFromFirestore.`);
-    return null;
 };

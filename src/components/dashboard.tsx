@@ -127,25 +127,26 @@ export function Dashboard({ planData }: DashboardProps) {
     calculateProfits();
   }, [planData, startDate, referralBonus]);
 
-  React.useEffect(() => {
-    const fetchWithdrawalStatus = async () => {
-      if (planData.id && planData.userId && planData.status !== 'pending') { 
-        setIsLoadingWithdrawalStatus(true);
-        try {
-          const request = await getWithdrawalRequestForInvestmentFromFirestore(planData.id, planData.userId);
-          setExistingWithdrawalRequest(request);
-        } catch (error) {
-          console.error("Error fetching withdrawal status:", error);
-          toast({ title: "Error", description: "Could not load withdrawal status.", variant: "destructive" });
-        } finally {
-          setIsLoadingWithdrawalStatus(false);
-        }
-      } else {
-        setIsLoadingWithdrawalStatus(false); 
+  const fetchWithdrawalStatus = React.useCallback(async () => {
+    if (planData.id && planData.userId && planData.status !== 'pending') { 
+      setIsLoadingWithdrawalStatus(true);
+      try {
+        const request = await getWithdrawalRequestForInvestmentFromFirestore(planData.id, planData.userId);
+        setExistingWithdrawalRequest(request);
+      } catch (error) {
+        console.error("Error fetching withdrawal status:", error);
+        toast({ title: "Error", description: "Could not load withdrawal status.", variant: "destructive" });
+      } finally {
+        setIsLoadingWithdrawalStatus(false);
       }
-    };
-    fetchWithdrawalStatus();
+    } else {
+      setIsLoadingWithdrawalStatus(false); 
+    }
   }, [planData.id, planData.userId, planData.status, toast]);
+
+  React.useEffect(() => {
+    fetchWithdrawalStatus();
+  }, [fetchWithdrawalStatus]);
 
 
   if (planData.status === 'pending') {
@@ -253,12 +254,13 @@ export function Dashboard({ planData }: DashboardProps) {
       }
       setIsSubmittingWithdrawal(true);
       try {
+          // Use the higher end of the estimated return for withdrawal amount
           const withdrawalAmount = finalTotalReturnMax; 
           const requestData: Omit<WithdrawalRequestFirestore, 'id' | 'status' | 'requestDate' | 'processedDate' | 'rejectionReason' | 'transactionId'> = {
               userId: planData.userId, 
-              userName: planData.userName, // Use denormalized name from planData
-              userPhoneNumber: planData.userPhoneNumber, // Use denormalized phone from planData
-              investmentId: planData.id!, // ID of the plan investment document
+              userName: planData.userName, 
+              userPhoneNumber: planData.userPhoneNumber, 
+              investmentId: planData.id!, 
               investmentTitle: planData.planTitle, 
               withdrawalAmount: withdrawalAmount,
               paymentMethod: withdrawalMethod,
@@ -270,6 +272,7 @@ export function Dashboard({ planData }: DashboardProps) {
           setIsWithdrawalModalOpen(false);
           setWithdrawalMethod(null);
           setAccountNumber('');
+          fetchWithdrawalStatus(); // Refresh status
       } catch (error) {
           console.error("Withdrawal request error:", error);
           toast({ variant: "destructive", title: "Request Failed", description: "Could not submit your withdrawal request." });
@@ -365,7 +368,7 @@ export function Dashboard({ planData }: DashboardProps) {
         <CardHeader>
           <CardTitle>Investment Progress</CardTitle>
           <CardDescription>
-            {daysElapsed} of {planData.durationInDays} days completed. {daysRemaining > 0 ? `${formatDistanceToNowStrict(planEndDate, {unit: 'day'})} remaining.` : 'Plan completed.'}
+            {daysElapsed} of {planData.durationInDays} days completed. {daysRemaining > 0 && !isPlanEffectivelyComplete ? `${formatDistanceToNowStrict(planEndDate, {unit: 'day'})} remaining.` : 'Plan term completed.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -374,20 +377,28 @@ export function Dashboard({ planData }: DashboardProps) {
            {isPlanEffectivelyComplete && (
                 <div className="mt-6 text-center">
                     {isLoadingWithdrawalStatus ? (
-                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                         <div className="flex justify-center items-center">
+                            <Loader2 className="h-6 w-6 animate-spin mr-2 text-muted-foreground" /> 
+                            <span className="text-muted-foreground">Loading withdrawal status...</span>
+                         </div>
                     ) : existingWithdrawalRequest ? (
                         <Alert 
-                            variant={existingWithdrawalRequest.status === 'completed' ? 'default' : (existingWithdrawalRequest.status === 'rejected' ? 'destructive' : 'default')} 
+                            variant={
+                                existingWithdrawalRequest.status === 'completed' ? 'default' : 
+                                existingWithdrawalRequest.status === 'rejected' ? 'destructive' : 
+                                'default' // 'pending' or 'processing'
+                            } 
                             className="max-w-md mx-auto text-left"
                         >
                              <Wallet className="h-4 w-4" />
                             <AlertTitle>Withdrawal Request: {existingWithdrawalRequest.status.charAt(0).toUpperCase() + existingWithdrawalRequest.status.slice(1)}</AlertTitle>
                             <AlertDescription className="space-y-1">
                                 <p>Amount: <strong>{formatCurrency(existingWithdrawalRequest.withdrawalAmount)}</strong></p>
-                                <p>Method: <strong>{existingWithdrawalRequest.paymentMethod}</strong> (Account: {existingWithdrawalRequest.accountNumber})</p>
+                                <p>Method: <strong className="capitalize">{existingWithdrawalRequest.paymentMethod}</strong> (Account: {existingWithdrawalRequest.accountNumber})</p>
                                 <p>Requested: {formatFirestoreTimestamp(existingWithdrawalRequest.requestDate)}</p>
-                                {existingWithdrawalRequest.status === 'pending' && <p>Processing typically takes 1-3 business days.</p>}
-                                {existingWithdrawalRequest.status === 'rejected' && existingWithdrawalRequest.rejectionReason && <p>Reason: {existingWithdrawalRequest.rejectionReason}</p>}
+                                {existingWithdrawalRequest.status === 'pending' && <p>Your request is awaiting processing. This usually takes 1-3 business days.</p>}
+                                {existingWithdrawalRequest.status === 'processing' && <p>Your request is currently being processed.</p>}
+                                {existingWithdrawalRequest.status === 'rejected' && existingWithdrawalRequest.rejectionReason && <p className="text-destructive">Reason: {existingWithdrawalRequest.rejectionReason}</p>}
                                 {existingWithdrawalRequest.status === 'completed' && existingWithdrawalRequest.transactionId && <p>Transaction ID: {existingWithdrawalRequest.transactionId}</p>}
                                 {existingWithdrawalRequest.status === 'completed' && existingWithdrawalRequest.processedDate && <p>Processed: {formatFirestoreTimestamp(existingWithdrawalRequest.processedDate)}</p>}
                             </AlertDescription>
@@ -435,13 +446,13 @@ export function Dashboard({ planData }: DashboardProps) {
                             ? formatCurrency(entry.cumulativeMin)
                             : `${formatCurrency(entry.cumulativeMin)} – ${formatCurrency(entry.cumulativeMax)}`;
                     return (
-                        <TableRow key={entry.day} className={isEntryPastOrToday && !isPlanEffectivelyComplete ? 'bg-muted/30' : ''}>
+                        <TableRow key={entry.day} className={isEntryPastOrToday && !isPlanEffectivelyComplete && planData.status === 'approved' ? 'bg-muted/30' : ''}>
                         <TableCell className="font-medium">{entry.day}</TableCell>
                         <TableCell>{entry.date}</TableCell>
-                        <TableCell className={`text-right ${isEntryPastOrToday && !isPlanEffectivelyComplete ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                        <TableCell className={`text-right ${isEntryPastOrToday && !isPlanEffectivelyComplete && planData.status === 'approved' ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                             {dailyProfitText}
                         </TableCell>
-                        <TableCell className={`text-right ${isEntryPastOrToday && !isPlanEffectivelyComplete ? 'font-semibold' : 'text-muted-foreground'}`}>
+                        <TableCell className={`text-right ${isEntryPastOrToday && !isPlanEffectivelyComplete && planData.status === 'approved' ? 'font-semibold' : 'text-muted-foreground'}`}>
                             {cumulativeProfitText}
                         </TableCell>
                         </TableRow>
@@ -454,14 +465,14 @@ export function Dashboard({ planData }: DashboardProps) {
         </Card>
       )}
 
-        <Dialog open={isWithdrawalModalOpen} onOpenChange={setIsWithdrawalModalOpen}>
+        <Dialog open={isWithdrawalModalOpen} onOpenChange={(open) => { if(!open) {setWithdrawalMethod(null); setAccountNumber('');} setIsWithdrawalModalOpen(open)}}>
             <DialogContent className="sm:max-w-[480px]">
                 <DialogHeader>
                     <DialogTitle className="text-2xl flex items-center gap-2">
                         <Banknote className="h-6 w-6 text-primary"/> Request Withdrawal
                     </DialogTitle>
                     <DialogDescription>
-                        Your investment plan is complete! Request your total estimated return of approximately <strong>{finalTotalReturnText}</strong>.
+                        Your investment plan term is complete! You can request your total estimated return of approximately <strong>{finalTotalReturnText}</strong>.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-6 py-4">
@@ -474,14 +485,14 @@ export function Dashboard({ planData }: DashboardProps) {
                          >
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="easypaisa" id="r-easypaisa" />
-                                <Label htmlFor="r-easypaisa" className="font-normal flex items-center gap-1">
+                                <Label htmlFor="r-easypaisa" className="font-normal flex items-center gap-1 cursor-pointer">
                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 10v-2m0-4h.01M7.757 14.757l-.707.707M16.243 14.757l.707.707M9.172 10.172a4 4 0 015.656 0M14.828 10.172a4 4 0 01-5.656 0" /></svg>
                                      Easypaisa
                                  </Label>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="jazzcash" id="r-jazzcash" />
-                                <Label htmlFor="r-jazzcash" className="font-normal flex items-center gap-1">
+                                <Label htmlFor="r-jazzcash" className="font-normal flex items-center gap-1 cursor-pointer">
                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10s5 2 5 2 1 .5 1 1 .5 1 1 1-1 .5-1 1-.5 1-1 1-2 1-2 1-2.47 2-4.529 2M12 18a6 6 0 006-6M12 18a6 6 0 01-6-6" /></svg>
                                      JazzCash
                                  </Label>
@@ -531,5 +542,3 @@ export function Dashboard({ planData }: DashboardProps) {
     </div>
   );
 }
-
-    

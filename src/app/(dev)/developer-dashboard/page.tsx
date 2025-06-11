@@ -4,10 +4,10 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  getAllSubmittedPlansForAdmin, // New: Fetches all plans from all users' subcollections
-  approveSubmittedPlan,       // New: Approves a plan in a user's subcollection
-  rejectSubmittedPlan,        // New: Rejects a plan in a user's subcollection
-  type UserPlanData,          // New: The type for plan documents in subcollections
+  getAllSubmittedPlansForAdmin, 
+  approveSubmittedPlan,       
+  rejectSubmittedPlan,        
+  type UserPlanData,          
 } from '@/lib/investment-store';
 import {
   getPendingWithdrawalRequestsFromFirestore, 
@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, isPast } from 'date-fns';
 import Image from 'next/image'; 
-import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Ban, WalletCards, Users, UserCheck, Eye } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, ExternalLink, Download, Send, Ban, WalletCards, Users, UserCheck, Eye, Info } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -37,6 +37,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import type { Timestamp } from 'firebase/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const formatCurrency = (amount: number): string => {
   if (!Number.isFinite(amount)) {
@@ -70,7 +71,7 @@ interface UserSummaryForAdmin {
 export default function DeveloperDashboardPage() {
   const router = useRouter();
 
-  const [allUserPlans, setAllUserPlans] = React.useState<UserPlanData[]>([]); // Holds all plans from all users
+  const [allUserPlans, setAllUserPlans] = React.useState<UserPlanData[]>([]); 
   const [pendingInvestments, setPendingInvestments] = React.useState<UserPlanData[]>([]);
   const [activeCompletedInvestments, setActiveCompletedInvestments] = React.useState<UserPlanData[]>([]);
   
@@ -82,7 +83,7 @@ export default function DeveloperDashboardPage() {
   const [isLoadingAllPlans, setIsLoadingAllPlans] = React.useState(true);
   const [isLoadingWithdrawals, setIsLoadingWithdrawals] = React.useState(true);
 
-  const [isProcessingInvestment, setIsProcessingInvestment] = React.useState<Record<string, boolean>>({}); // Key will be plan.id
+  const [isProcessingInvestment, setIsProcessingInvestment] = React.useState<Record<string, boolean>>({}); 
   const [isProcessingWithdrawal, setIsProcessingWithdrawal] = React.useState<Record<string, boolean>>({});
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
   
@@ -108,23 +109,22 @@ export default function DeveloperDashboardPage() {
       
       setAllUserPlans(allPlansFromDb);
       setPendingInvestments(allPlansFromDb.filter(p => p.status === 'pending'));
-      setActiveCompletedInvestments(allPlansFromDb.filter(p => p.status === 'approved' || p.status === 'completed'));
+      setActiveCompletedInvestments(allPlansFromDb.filter(p => p.status === 'approved' || p.status === 'completed').sort((a,b) => (b.approvalDate?.toDate()?.getTime() || 0) - (a.approvalDate?.toDate()?.getTime() || 0) ));
       setPendingWithdrawals(pendingW);
 
-      // User Management Tab Data
       const usersMap = new Map<string, UserSummaryForAdmin>();
       allPlansFromDb.forEach(plan => {
         if (!usersMap.has(plan.userId)) {
           usersMap.set(plan.userId, {
             userId: plan.userId,
-            userName: plan.userName, // Assumes userName is denormalized in UserPlanData
-            userPhoneNumber: plan.userPhoneNumber, // Assumes userPhoneNumber is denormalized
+            userName: plan.userName, 
+            userPhoneNumber: plan.userPhoneNumber, 
             investmentCount: 0,
           });
         }
         usersMap.get(plan.userId)!.investmentCount++;
       });
-      setUniqueUsers(Array.from(usersMap.values()));
+      setUniqueUsers(Array.from(usersMap.values()).sort((a,b) => a.userName.localeCompare(b.userName)));
       
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -152,11 +152,11 @@ export default function DeveloperDashboardPage() {
     setIsProcessingInvestment((prev) => ({ ...prev, [planToApprove.id!]: true }));
     try {
       await approveSubmittedPlan(planToApprove.userId, planToApprove.id!);
-      toast({ title: 'Investment Approved', description: `Investment ID ${planToApprove.id} for user ${planToApprove.userName} marked as approved.` });
+      toast({ title: 'Investment Approved', description: `Investment ID ${planToApprove.id!.substring(0,10)}... for user ${planToApprove.userName} marked as approved.` });
       fetchAllData(); 
     } catch (error) {
       console.error('Approval error:', error);
-      toast({ title: 'Approval Failed', description: `Could not approve investment ${planToApprove.id}.`, variant: 'destructive' });
+      toast({ title: 'Approval Failed', description: `Could not approve investment ${planToApprove.id!.substring(0,10)}...`, variant: 'destructive' });
     } finally {
       setIsProcessingInvestment((prev) => ({ ...prev, [planToApprove.id!]: false }));
     }
@@ -179,13 +179,13 @@ export default function DeveloperDashboardPage() {
     setIsProcessingInvestment((prev) => ({ ...prev, [planId]: true }));
     try {
       await rejectSubmittedPlan(userId, planId, investmentRejectionReason.trim());
-      toast({ title: 'Investment Rejected', description: `Investment ID ${planId} marked as rejected.`, variant: 'destructive' });
+      toast({ title: 'Investment Rejected', description: `Investment ID ${planId.substring(0,10)}... marked as rejected.`, variant: 'destructive' });
       fetchAllData(); 
       setIsRejectionModalOpen(false);
       setCurrentPlanToReject(null);
     } catch (error) {
       console.error('Rejection error:', error);
-      toast({ title: 'Rejection Failed', description: `Could not reject investment ${planId}.`, variant: 'destructive' });
+      toast({ title: 'Rejection Failed', description: `Could not reject investment ${planId.substring(0,10)}...`, variant: 'destructive' });
     } finally {
       setIsProcessingInvestment((prev) => ({ ...prev, [planId]: false }));
     }
@@ -210,12 +210,12 @@ export default function DeveloperDashboardPage() {
       setIsProcessingWithdrawal((prev) => ({ ...prev, [requestId]: true }));
       try {
           await updateWithdrawalStatusInFirestore(requestId, 'completed', { transactionId: transactionIdInput.trim() });
-          toast({ title: 'Withdrawal Completed', description: `Withdrawal ${requestId} marked as completed.` });
+          toast({ title: 'Withdrawal Completed', description: `Withdrawal ${requestId.substring(0,10)}... marked as completed.` });
           fetchAllData();
           closeWithdrawalActionModal();
       } catch (error) {
           console.error('Withdrawal completion error:', error);
-          toast({ title: 'Completion Failed', description: `Could not mark withdrawal ${requestId} as completed.`, variant: 'destructive' });
+          toast({ title: 'Completion Failed', description: `Could not mark withdrawal ${requestId.substring(0,10)}... as completed.`, variant: 'destructive' });
       } finally {
           setIsProcessingWithdrawal((prev) => ({ ...prev, [requestId]: false }));
       }
@@ -230,12 +230,12 @@ export default function DeveloperDashboardPage() {
        setIsProcessingWithdrawal((prev) => ({ ...prev, [requestId]: true }));
        try {
            await updateWithdrawalStatusInFirestore(requestId, 'rejected', { rejectionReason: rejectionReasonInput.trim() }); 
-           toast({ title: 'Withdrawal Rejected', description: `Withdrawal ${requestId} has been rejected.`, variant: 'destructive' });
+           toast({ title: 'Withdrawal Rejected', description: `Withdrawal ${requestId.substring(0,10)}... has been rejected.`, variant: 'destructive' });
            fetchAllData();
            closeWithdrawalActionModal();
        } catch (error) {
            console.error('Withdrawal rejection error:', error);
-           toast({ title: 'Rejection Failed', description: `Could not reject withdrawal ${requestId}.`, variant: 'destructive' });
+           toast({ title: 'Rejection Failed', description: `Could not reject withdrawal ${requestId.substring(0,10)}...`, variant: 'destructive' });
        } finally {
            setIsProcessingWithdrawal((prev) => ({ ...prev, [requestId]: false }));
        }
@@ -258,7 +258,6 @@ export default function DeveloperDashboardPage() {
               <TabsTrigger value="user-management">User Management ({uniqueUsers.length})</TabsTrigger>
           </TabsList>
 
-          {/* Pending Investments Tab */}
           <TabsContent value="pending-investments">
               <Card>
                   <CardHeader>
@@ -344,7 +343,6 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
-          {/* Active/Completed Investments Tab */}
           <TabsContent value="active-investments">
               <Card>
                   <CardHeader>
@@ -373,15 +371,27 @@ export default function DeveloperDashboardPage() {
                               </TableHeader>
                               <TableBody>
                                   {activeCompletedInvestments.map((plan) => {
-                                      const startDate = plan.approvalDate ? (plan.approvalDate as Timestamp).toDate() : new Date(); // Fallback, though approvalDate should exist
+                                      const startDate = plan.approvalDate ? (plan.approvalDate as Timestamp).toDate() : new Date(); 
                                       const planEndDate = plan.endDate ? (plan.endDate as Timestamp).toDate() : addDays(startDate, plan.durationInDays);
-                                      const isPlanConsideredComplete = plan.status === 'completed' || (plan.status === 'approved' && isPast(planEndDate));
+                                      const isPlanTermOver = plan.status === 'approved' && isPast(planEndDate);
                                       
                                       let displayStatus = plan.status.charAt(0).toUpperCase() + plan.status.slice(1);
-                                      if (plan.status === 'approved' && isPast(planEndDate) && plan.status !== 'completed') {
-                                        displayStatus = "Ended (Awaiting Withdrawal)"; 
-                                      }
+                                      let displayStatusVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
 
+                                      if (plan.status === 'completed') {
+                                        displayStatus = "Completed";
+                                        displayStatusVariant = "secondary";
+                                      } else if (isPlanTermOver) {
+                                        displayStatus = "Ended (Awaiting Withdrawal)"; 
+                                        displayStatusVariant = "default"; 
+                                      } else if (plan.status === 'approved') {
+                                        displayStatus = "Active";
+                                        displayStatusVariant = "default";
+                                      } else if (plan.status === 'rejected') {
+                                        displayStatus = "Rejected";
+                                        displayStatusVariant = "destructive";
+                                      }
+                                      
                                       return (
                                           <TableRow key={plan.id}>
                                               <TableCell>
@@ -393,7 +403,7 @@ export default function DeveloperDashboardPage() {
                                               <TableCell>{formatFirestoreTimestamp(plan.approvalDate)}</TableCell>
                                               <TableCell>{formatFirestoreTimestamp(plan.endDate, false)}</TableCell>
                                               <TableCell>
-                                                  <Badge variant={isPlanConsideredComplete ? "secondary" : (plan.status === 'approved' ? "default" : (plan.status === 'rejected' ? "destructive" : "outline"))}>
+                                                  <Badge variant={displayStatusVariant}>
                                                       {displayStatus}
                                                   </Badge>
                                               </TableCell>
@@ -420,7 +430,6 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
-          {/* Pending Withdrawals Tab - Stays mostly the same */}
           <TabsContent value="pending-withdrawals">
                <Card>
                   <CardHeader>
@@ -433,7 +442,13 @@ export default function DeveloperDashboardPage() {
                               <Loader2 className="h-12 w-12 animate-spin text-primary" />
                           </div>
                       ) : pendingWithdrawals.length === 0 ? (
-                          <p className="text-center text-muted-foreground mt-6">No pending withdrawal requests found.</p>
+                           <Alert>
+                              <Info className="h-4 w-4" />
+                              <AlertTitle>No Pending Requests</AlertTitle>
+                              <AlertDescription>
+                                There are currently no pending withdrawal requests to review.
+                              </AlertDescription>
+                            </Alert>
                       ) : (
                            <Table>
                               <TableHeader>
@@ -500,7 +515,6 @@ export default function DeveloperDashboardPage() {
               </Card>
           </TabsContent>
 
-          {/* User Management Tab */}
           <TabsContent value="user-management">
             <Card>
               <CardHeader>
@@ -595,7 +609,7 @@ export default function DeveloperDashboardPage() {
                                       <TableCell>{planEndDate ? format(planEndDate, 'P') : 'N/A'}</TableCell>
                                       <TableCell>
                                         <Badge variant={
-                                            plan.status === 'approved' ? 'default' :
+                                            plan.status === 'approved' ? ( (planEndDate && isPast(planEndDate)) ? 'default' : 'default') : // Could differentiate 'active' from 'ended' more if needed
                                             plan.status === 'completed' ? 'secondary' :
                                             plan.status === 'pending' ? 'outline' :
                                             plan.status === 'rejected' ? 'destructive' : 'outline'
@@ -719,7 +733,7 @@ export default function DeveloperDashboardPage() {
                 <div className="grid gap-4 py-4">
                     {withdrawalAction.type === 'complete' && (
                         <div className="space-y-2">
-                            <Label htmlFor="transaction-id">Transaction ID</Label>
+                            <Label htmlFor="transaction-id-input">Transaction ID</Label>
                             <Input
                                 id="transaction-id-input" 
                                 value={transactionIdInput}
@@ -732,7 +746,7 @@ export default function DeveloperDashboardPage() {
                     )}
                     {withdrawalAction.type === 'reject' && (
                         <div className="space-y-2">
-                            <Label htmlFor="rejection-reason">Rejection Reason</Label>
+                            <Label htmlFor="rejection-reason-input">Rejection Reason</Label>
                              <Textarea
                                 id="rejection-reason-input" 
                                 value={rejectionReasonInput}
@@ -748,7 +762,7 @@ export default function DeveloperDashboardPage() {
                             <CardDescription className="text-xs space-y-0.5">
                                 <p><strong>User:</strong> {withdrawalAction.request.userName} ({withdrawalAction.request.userPhoneNumber})</p>
                                 <p><strong>Amount:</strong> {formatCurrency(withdrawalAction.request.withdrawalAmount)}</p>
-                                <p><strong>Method:</strong> {withdrawalAction.request.paymentMethod} - {withdrawalAction.request.accountNumber}</p>
+                                <p><strong>Method:</strong> <span className="capitalize">{withdrawalAction.request.paymentMethod}</span> - {withdrawalAction.request.accountNumber}</p>
                                 <p><strong>Investment:</strong> {withdrawalAction.request.investmentTitle}</p>
                             </CardDescription>
                         </Card>
@@ -784,5 +798,3 @@ export default function DeveloperDashboardPage() {
     </div>
   );
 }
-
-    
