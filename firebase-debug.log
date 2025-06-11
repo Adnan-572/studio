@@ -1,31 +1,28 @@
-[debug] [2025-05-19T08:11:06.771Z] ----------------------------------------------------------------------
-[debug] [2025-05-19T08:11:06.774Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/x1y0l2xj62jgmz6csprhhqzibvdggdpk-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js init hosting
-[debug] [2025-05-19T08:11:06.775Z] CLI Version:   14.3.1
-[debug] [2025-05-19T08:11:06.775Z] Platform:      linux
-[debug] [2025-05-19T08:11:06.776Z] Node Version:  v20.19.0
-[debug] [2025-05-19T08:11:06.776Z] Time:          Mon May 19 2025 08:11:06 GMT+0000 (Coordinated Universal Time)
-[debug] [2025-05-19T08:11:06.776Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T10:12:22.675Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T10:12:22.678Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js login:ci
+[debug] [2025-06-11T10:12:22.679Z] CLI Version:   14.3.1
+[debug] [2025-06-11T10:12:22.679Z] Platform:      linux
+[debug] [2025-06-11T10:12:22.679Z] Node Version:  v20.19.0
+[debug] [2025-06-11T10:12:22.679Z] Time:          Wed Jun 11 2025 10:12:22 GMT+0000 (Coordinated Universal Time)
+[debug] [2025-06-11T10:12:22.680Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2025-05-19T08:11:06.779Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
-[debug] [2025-05-19T08:11:06.848Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2025-05-19T08:11:07.231Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
-[debug] [2025-05-19T08:11:07.234Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
-[debug] [2025-05-19T08:11:10.626Z] Running auto auth
+[warn] ⚠  Authenticating with a `login:ci` token is deprecated and will be removed in a future major version of `firebase-tools`. Instead, use a service account key with `GOOGLE_APPLICATION_CREDENTIALS`: https://cloud.google.com/docs/authentication/getting-started 
 [info] 
-     ######## #### ########  ######## ########     ###     ######  ########
-     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
-     ######    ##  ########  ######   ########  #########  ######  ######
-     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
-     ##       #### ##     ## ######## ########  ##     ##  ######  ########
-
-You're about to initialize a Firebase project in this directory:
-
-  /home/user/studio
-
+[info] Visit this URL on this device to log in:
+[info] https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=238358900&redirect_uri=http%3A%2F%2Flocalhost%3A9005
 [info] 
-=== Project Setup
+[info] Waiting for authentication...
+[debug] [2025-06-11T10:36:36.926Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T10:36:36.929Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js login:ci
+[debug] [2025-06-11T10:36:36.929Z] CLI Version:   14.3.1
+[debug] [2025-06-11T10:36:36.930Z] Platform:      linux
+[debug] [2025-06-11T10:36:36.930Z] Node Version:  v20.19.0
+[debug] [2025-06-11T10:36:36.930Z] Time:          Wed Jun 11 2025 10:36:36 GMT+0000 (Coordinated Universal Time)
+[debug] [2025-06-11T10:36:36.930Z] ----------------------------------------------------------------------
+[debug] 
+[warn] ⚠  Authenticating with a `login:ci` token is deprecated and will be removed in a future major version of `firebase-tools`. Instead, use a service account key with `GOOGLE_APPLICATION_CREDENTIALS`: https://cloud.google.com/docs/authentication/getting-started 
 [info] 
-[info] First, let's associate this project directory with a Firebase project.
-[info] You can create multiple project aliases by running firebase use --add, 
-[info] but for now we'll just set up a default project.
+[info] Visit this URL on this device to log in:
+[info] https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=497816859&redirect_uri=http%3A%2F%2Flocalhost%3A9005
 [info] 
+[info] Waiting for authentication...
