@@ -12,7 +12,8 @@ import {
   orderBy,
   addDoc,
   collectionGroup,
-  writeBatch
+  writeBatch,
+  getDoc // Added getDoc
 } from 'firebase/firestore';
 
 export interface UserPlanData {
@@ -146,12 +147,12 @@ export const approveSubmittedPlan = async (userId: string, planInvestmentId: str
   }
   try {
     const planDocRef = doc(db, "users", userId, "plans", planInvestmentId);
-    const planDocSnap = await getDocs(query(collection(db, "users", userId, "plans"), where("__name__", "==", planInvestmentId))); // simple getDoc not working here.
+    const planDocSnap = await getDoc(planDocRef); // Changed to use getDoc
     
-    if (planDocSnap.empty || !planDocSnap.docs[0].exists()) {
+    if (!planDocSnap.exists()) { // Simpler check for document existence
         throw new Error(`Plan document ${planInvestmentId} not found for user ${userId}`);
     }
-    const planData = planDocSnap.docs[0].data() as UserPlanData;
+    const planData = planDocSnap.data() as UserPlanData; // Get data directly
 
     const approvalTime = Timestamp.now();
     const planEndDate = new Timestamp(
@@ -336,5 +337,7 @@ export const rejectInvestmentInFirestore = async (submissionId: string, reason: 
   console.warn(`Legacy rejectInvestmentInFirestore(${submissionId}) called. This ID is now relative to a subcollection. Refactor call site.`);
   throw new Error("Legacy rejectInvestmentInFirestore called with top-level ID. Requires refactoring to provide userId and planInvestmentId.");
 };
+
+    
 
     
