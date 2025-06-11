@@ -1,0 +1,9 @@
+{
+    "hosting": {
+      "site": "rupay-growth",
+      "appAssociation": "AUTO",
+      "public": "public",
+      "cleanUrls": true
+    }
+  }
+  

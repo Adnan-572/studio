@@ -1,28 +1,18 @@
-[debug] [2025-06-11T10:12:22.675Z] ----------------------------------------------------------------------
-[debug] [2025-06-11T10:12:22.678Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js login:ci
-[debug] [2025-06-11T10:12:22.679Z] CLI Version:   14.3.1
-[debug] [2025-06-11T10:12:22.679Z] Platform:      linux
-[debug] [2025-06-11T10:12:22.679Z] Node Version:  v20.19.0
-[debug] [2025-06-11T10:12:22.679Z] Time:          Wed Jun 11 2025 10:12:22 GMT+0000 (Coordinated Universal Time)
-[debug] [2025-06-11T10:12:22.680Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T17:13:26.328Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T17:13:26.330Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js deploy --only hosting
+[debug] [2025-06-11T17:13:26.331Z] CLI Version:   14.3.1
+[debug] [2025-06-11T17:13:26.331Z] Platform:      linux
+[debug] [2025-06-11T17:13:26.332Z] Node Version:  v20.19.0
+[debug] [2025-06-11T17:13:26.332Z] Time:          Wed Jun 11 2025 17:13:26 GMT+0000 (Coordinated Universal Time)
+[debug] [2025-06-11T17:13:26.332Z] ----------------------------------------------------------------------
 [debug] 
-[warn] ⚠  Authenticating with a `login:ci` token is deprecated and will be removed in a future major version of `firebase-tools`. Instead, use a service account key with `GOOGLE_APPLICATION_CREDENTIALS`: https://cloud.google.com/docs/authentication/getting-started 
-[info] 
-[info] Visit this URL on this device to log in:
-[info] https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=238358900&redirect_uri=http%3A%2F%2Flocalhost%3A9005
-[info] 
-[info] Waiting for authentication...
-[debug] [2025-06-11T10:36:36.926Z] ----------------------------------------------------------------------
-[debug] [2025-06-11T10:36:36.929Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js login:ci
-[debug] [2025-06-11T10:36:36.929Z] CLI Version:   14.3.1
-[debug] [2025-06-11T10:36:36.930Z] Platform:      linux
-[debug] [2025-06-11T10:36:36.930Z] Node Version:  v20.19.0
-[debug] [2025-06-11T10:36:36.930Z] Time:          Wed Jun 11 2025 10:36:36 GMT+0000 (Coordinated Universal Time)
-[debug] [2025-06-11T10:36:36.930Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T17:13:26.755Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-06-11T17:14:27.501Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T17:14:27.503Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js deploy
+[debug] [2025-06-11T17:14:27.504Z] CLI Version:   14.3.1
+[debug] [2025-06-11T17:14:27.504Z] Platform:      linux
+[debug] [2025-06-11T17:14:27.504Z] Node Version:  v20.19.0
+[debug] [2025-06-11T17:14:27.504Z] Time:          Wed Jun 11 2025 17:14:27 GMT+0000 (Coordinated Universal Time)
+[debug] [2025-06-11T17:14:27.505Z] ----------------------------------------------------------------------
 [debug] 
-[warn] ⚠  Authenticating with a `login:ci` token is deprecated and will be removed in a future major version of `firebase-tools`. Instead, use a service account key with `GOOGLE_APPLICATION_CREDENTIALS`: https://cloud.google.com/docs/authentication/getting-started 
-[info] 
-[info] Visit this URL on this device to log in:
-[info] https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=497816859&redirect_uri=http%3A%2F%2Flocalhost%3A9005
-[info] 
-[info] Waiting for authentication...
+[debug] [2025-06-11T17:14:27.898Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
