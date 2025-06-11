@@ -1,18 +1,9 @@
-[debug] [2025-06-11T17:13:26.328Z] ----------------------------------------------------------------------
-[debug] [2025-06-11T17:13:26.330Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js deploy --only hosting
-[debug] [2025-06-11T17:13:26.331Z] CLI Version:   14.3.1
-[debug] [2025-06-11T17:13:26.331Z] Platform:      linux
-[debug] [2025-06-11T17:13:26.332Z] Node Version:  v20.19.0
-[debug] [2025-06-11T17:13:26.332Z] Time:          Wed Jun 11 2025 17:13:26 GMT+0000 (Coordinated Universal Time)
-[debug] [2025-06-11T17:13:26.332Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T17:59:05.795Z] ----------------------------------------------------------------------
+[debug] [2025-06-11T17:59:05.798Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js init
+[debug] [2025-06-11T17:59:05.799Z] CLI Version:   14.3.1
+[debug] [2025-06-11T17:59:05.799Z] Platform:      linux
+[debug] [2025-06-11T17:59:05.800Z] Node Version:  v20.19.0
+[debug] [2025-06-11T17:59:05.800Z] Time:          Wed Jun 11 2025 17:59:05 GMT+0000 (Coordinated Universal Time)
+[debug] [2025-06-11T17:59:05.800Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2025-06-11T17:13:26.755Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2025-06-11T17:14:27.501Z] ----------------------------------------------------------------------
-[debug] [2025-06-11T17:14:27.503Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /nix/store/nh3zwzkz6wh6qa7bd2ywzr7irjij7j1i-firebase-tools-14.3.1/lib/node_modules/firebase-tools/lib/bin/firebase.js deploy
-[debug] [2025-06-11T17:14:27.504Z] CLI Version:   14.3.1
-[debug] [2025-06-11T17:14:27.504Z] Platform:      linux
-[debug] [2025-06-11T17:14:27.504Z] Node Version:  v20.19.0
-[debug] [2025-06-11T17:14:27.504Z] Time:          Wed Jun 11 2025 17:14:27 GMT+0000 (Coordinated Universal Time)
-[debug] [2025-06-11T17:14:27.505Z] ----------------------------------------------------------------------
-[debug] 
-[debug] [2025-06-11T17:14:27.898Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-06-11T17:59:06.247Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
