@@ -1,0 +1,10 @@
+npm run dev
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    allowedDevOrigins: ['3001-idx-studio-1746374189150.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev']
+  }
+}
+
+module.exports = nextConfig
+    
