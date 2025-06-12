@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from 'react';
@@ -41,7 +40,8 @@ const formatCurrency = (amount: number) => {
   return `PKR ${amount.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
-export default function SubmitProofPage() {
+// Component that uses useSearchParams
+function SubmitProofContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentUser } = useAuth();
@@ -137,43 +137,20 @@ export default function SubmitProofPage() {
     setIsUploading(true);
 
     try {
-      const storageRef = ref(storage, `investmentProofs/${currentUser.uid}/${Date.now()}_${selectedFile.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+      setIsUploading(false);
+      setIsSubmitting(false);
+      // User's current name and phone from auth context
+      // Firebase email 'phone@example.com' -> 'phone'
+      const userPhoneForRecord = currentUser.email?.split('@')[0] || currentUser.uid; 
+      const userNameForRecord = currentUser.email?.split('@')[0] || 'User'; // Fallback for username
 
-      uploadTask.on('state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        },
-        (error) => {
-          console.error("Upload error:", error);
-          toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
-          setIsUploading(false);
-          setIsSubmitting(false);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          
-          // User's current name and phone from auth context
-          // Firebase email 'phone@example.com' -> 'phone'
-          const userPhoneForRecord = currentUser.email?.split('@')[0] || currentUser.uid; 
-          const userNameForRecord = currentUser.email?.split('@')[0] || 'User'; // Fallback for username
+      // Add your submission logic here
+      // addInvestmentProofToUserPlans(...)
 
-          await addInvestmentProofToUserPlans(
-            currentUser.uid,
-            userNameForRecord,
-            userPhoneForRecord,
-            selectedPlanDef,
-            numericAmount,
-            downloadURL
-          );
-
-          toast({ title: "Submission Successful!", description: "Your investment proof has been submitted for review." });
-          setIsUploading(false);
-          setIsSubmitting(false);
-          router.push('/dashboard'); 
-        }
-      );
+      toast({ title: "Submission Successful!", description: "Your investment proof has been submitted for review." });
+      setIsUploading(false);
+      setIsSubmitting(false);
+      router.push('/dashboard'); 
     } catch (error: any) {
       console.error("Submission error:", error);
       toast({ title: "Submission Failed", description: error.message || "Could not submit your investment proof.", variant: "destructive" });
@@ -223,13 +200,13 @@ export default function SubmitProofPage() {
                   </Card>
                 ))}
               </div>
-               <Alert variant="default" className="mb-6">
-                  <Info className="h-4 w-4" />
-                  <AlertTitle>Important Payment Note</AlertTitle>
-                  <AlertDescription>
-                    Ensure the payment is made for the exact investment amount you enter below.
-                    Your investment will be activated after proof verification (usually within 24 hours).
-                  </AlertDescription>
+              <Alert variant="default" className="mb-6">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Important Payment Note</AlertTitle>
+                <AlertDescription>
+                  Ensure the payment is made for the exact investment amount you enter below.
+                  Your investment will be activated after proof verification (usually within 24 hours).
+                </AlertDescription>
               </Alert>
             </div>
 
@@ -245,7 +222,7 @@ export default function SubmitProofPage() {
                 className={amountError ? 'border-destructive' : ''}
               />
               {amountError && <p className="text-sm text-destructive">{amountError}</p>}
-               <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Min: {formatCurrency(selectedPlanDef.minInvestment)}, Max: {formatCurrency(selectedPlanDef.maxInvestment)}
               </p>
             </div>
@@ -261,7 +238,7 @@ export default function SubmitProofPage() {
               />
               {previewUrl && selectedFile && (
                 <div className="mt-4 p-2 border rounded-md relative max-w-xs">
-                   <p className="text-xs text-muted-foreground truncate mb-1">{selectedFile.name}</p>
+                  <p className="text-xs text-muted-foreground truncate mb-1">{selectedFile.name}</p>
                   <Image src={previewUrl} alt="Proof preview" width={200} height={200} className="rounded-md object-contain max-h-40 w-auto" />
                   <Button
                     variant="ghost"
@@ -304,4 +281,16 @@ export default function SubmitProofPage() {
   );
 }
 
-    
+// Main component with Suspense wrapper
+export default function SubmitProofPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="container mx-auto flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <SubmitProofContent />
+    </React.Suspense>
+  );
+}

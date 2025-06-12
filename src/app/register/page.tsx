@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from 'react';
@@ -9,7 +8,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-export default function RegisterPage() {
+// Separate component jo useSearchParams use karta hai
+function RegisterContent() {
   const { currentUser, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,19 +39,35 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <AuthForm mode="register" initialReferralCode={referralCodeFromUrl || undefined} />
-           <p className="mt-6 text-center text-sm">
+          
+          <p className="mt-6 text-center text-sm">
             Already have an account?{' '}
             <Link href="/login" className="font-medium text-primary hover:underline">
               Login here
             </Link>
           </p>
-           {referralCodeFromUrl && (
+          
+          {referralCodeFromUrl && (
             <p className="mt-2 text-center text-xs text-muted-foreground">
               Referred by: {referralCodeFromUrl.substring(0,10)}...
             </p>
-           )}
+          )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Main component with Suspense
+export default function RegisterPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex min-h-screen flex-col items-center justify-center p-6">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <RegisterContent />
+    </React.Suspense>
   );
 }

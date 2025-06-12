@@ -1,0 +1,68 @@
+# Docker Build Commands
+
+# 1. Build Docker image locally
+docker build -t your-nextjs-app .
+
+# 2. Run Docker container locally for testing
+docker run -p 3000:3000 your-nextjs-app
+
+# 3. Using Docker Compose (recommended)
+docker-compose up --build
+
+# 4. Run in detached mode
+docker-compose up -d --build
+
+# 5. Stop the container
+docker-compose down
+
+# 6. View logs
+docker-compose logs -f
+
+# Google Cloud Build Commands (if using GCP)
+
+# 1. Build and deploy to Google Cloud Run
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/nextjs-app
+
+# 2. Deploy to Cloud Run
+gcloud run deploy --image gcr.io/YOUR_PROJECT_ID/nextjs-app --platform managed
+
+# Railway Deployment (if using Railway)
+
+# 1. Install Railway CLI
+npm install -g @railway/cli
+
+# 2. Login to Railway
+railway login
+
+# 3. Deploy
+railway up
+
+# Heroku Deployment (if using Heroku)
+
+# 1. Login to Heroku
+heroku login
+
+# 2. Create Heroku app
+heroku create your-app-name
+
+# 3. Set buildpack
+heroku buildpacks:set heroku/nodejs
+
+# 4. Deploy
+git push heroku main
+
+# DigitalOcean App Platform
+
+# 1. Connect GitHub repository
+# 2. Configure build settings:
+#    - Build Command: npm run build
+#    - Run Command: npm start
+#    - Environment: Node.js
+
+# Vercel (Recommended for Next.js)
+
+# 1. Install Vercel CLI
+npm i -g vercel
+
+# 2. Deploy
+vercel --prod

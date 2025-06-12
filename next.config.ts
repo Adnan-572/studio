@@ -1,8 +1,6 @@
-
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -22,10 +20,9 @@ const nextConfig: NextConfig = {
         hostname: 'firebasestorage.googleapis.com', // For Firebase Storage images
         port: '',
         pathname: '/**',
-      }
+      },
     ],
   },
-  // Remove allowedDevOrigins if not needed for specific Genkit/Firebase emulator setups
   // allowedDevOrigins: [ 
   //   'http://localhost:5000',
   //   'http://3001-idx-studio-1746374189150.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev',
